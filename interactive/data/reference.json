@@ -1,0 +1,1512 @@
+{
+  "generatedBy": "tools/exportWebReference.m",
+  "slip": {
+    "spec": [
+      {
+        "name": "m",
+        "value": 80,
+        "units": "kg",
+        "min": 1,
+        "max": 150,
+        "group": "parameter",
+        "description": "body mass"
+      },
+      {
+        "name": "L0",
+        "value": 1,
+        "units": "m",
+        "min": 0.1,
+        "max": 2,
+        "group": "parameter",
+        "description": "leg rest length"
+      },
+      {
+        "name": "k",
+        "value": 12000,
+        "units": "N/m",
+        "min": 1000,
+        "max": 60000,
+        "group": "parameter",
+        "description": "leg stiffness"
+      },
+      {
+        "name": "g",
+        "value": 9.81,
+        "units": "m/s^2",
+        "min": 1,
+        "max": 20,
+        "group": "parameter",
+        "description": "gravitational acceleration"
+      },
+      {
+        "name": "legAngleDeg",
+        "value": 64.0065624878925,
+        "units": "deg",
+        "min": 30,
+        "max": 89,
+        "group": "contact condition",
+        "description": "leg angle set at apex, from the ground in front of the body"
+      },
+      {
+        "name": "retractionDegPerS",
+        "value": 0,
+        "units": "deg/s",
+        "min": -200,
+        "max": 800,
+        "group": "contact condition",
+        "description": "rearward leg rotation rate during descending flight"
+      },
+      {
+        "name": "apexHeight",
+        "value": 0.914065973548051,
+        "units": "m",
+        "min": 0.2,
+        "max": 2,
+        "group": "initial condition",
+        "description": "height of the body at apex"
+      },
+      {
+        "name": "apexSpeed",
+        "value": 4.09997094485603,
+        "units": "m/s",
+        "min": 0.2,
+        "max": 10,
+        "group": "initial condition",
+        "description": "forward speed at apex"
+      }
+    ],
+    "presets": [
+      {
+        "name": "human",
+        "label": "Baseline (human-like)",
+        "m": 80,
+        "L0": 1,
+        "k": 12000,
+        "g": 9.81,
+        "legAngleDeg": 64.0065624878925,
+        "retractionDegPerS": 0,
+        "apexHeight": 0.914065973548051,
+        "apexSpeed": 4.09997094485603,
+        "meanSpeed": 3.99999999999987,
+        "stepFrequency": 3.00000000000401,
+        "lambda": 0.394370916692588,
+        "maxDrop": 0.14,
+        "peakVerticalForceBW": 2.40073180091962,
+        "contactTime": 0.221918656974246
+      },
+      {
+        "name": "humanLowStiffness",
+        "label": "Low leg stiffness",
+        "m": 80,
+        "L0": 1,
+        "k": 8000,
+        "g": 9.81,
+        "legAngleDeg": 58.5208436352711,
+        "retractionDegPerS": 0,
+        "apexHeight": 0.858785695685612,
+        "apexSpeed": 4.14631964421355,
+        "meanSpeed": 3.99999999999943,
+        "stepFrequency": 3.00000000000481,
+        "lambda": -0.587454606714166,
+        "maxDrop": 0.03,
+        "peakVerticalForceBW": 2.04535148801347,
+        "contactTime": 0.263643424725307
+      },
+      {
+        "name": "humanHighStiffness",
+        "label": "High leg stiffness",
+        "m": 80,
+        "L0": 1,
+        "k": 20000,
+        "g": 9.81,
+        "legAngleDeg": 69.553748982454,
+        "retractionDegPerS": 0,
+        "apexHeight": 0.966940033581004,
+        "apexSpeed": 4.0617934584961,
+        "meanSpeed": 4.00000000000054,
+        "stepFrequency": 2.99999999999529,
+        "lambda": 0.807528436139737,
+        "maxDrop": 0.25,
+        "peakVerticalForceBW": 2.9813542020066,
+        "contactTime": 0.177078156037723
+      }
+    ],
+    "cases": [
+      {
+        "name": "preset human",
+        "p": {
+          "m": 80,
+          "L0": 1,
+          "k": 12000,
+          "g": 9.81,
+          "legAngleDeg": 64.0065624878925,
+          "retractionDegPerS": 0
+        },
+        "apex": {
+          "y": 0.914065973548051,
+          "vx": 4.09997094485603
+        },
+        "firstStride": {
+          "exitReason": "cycleLimit",
+          "events": [
+            {
+              "time": 0.055707338177994115,
+              "guard": "touchdown"
+            },
+            {
+              "time": 0.2776259951522404,
+              "guard": "takeoff"
+            },
+            {
+              "time": 0.33333333333286941,
+              "guard": "apex"
+            }
+          ]
+        },
+        "exitReason": "cycleLimit",
+        "apexSequence": [
+          {
+            "y": 0.914065973548051,
+            "vx": 4.09997094485603
+          },
+          {
+            "y": 0.91406597355474051,
+            "vx": 4.0999709448270814
+          }
+        ],
+        "metrics": {
+          "period": 0.33333333333286941,
+          "contactTime": 0.22191865697424629,
+          "flightTime": 0.11141467635862312,
+          "stepLength": 1.3333333333314259,
+          "meanSpeed": 3.9999999999998446,
+          "touchdownAngleDeg": 64.0065624878925,
+          "takeoffAngleDeg": 115.99343751142193,
+          "legCompression": 0.15700786156073565,
+          "peakLegForceBW": 2.4007318281458048,
+          "peakVerticalForceBW": 2.4007318009196039,
+          "peakBrakingForceBW": 0.41343814101069631,
+          "comDropStance": 0.055852121249651887,
+          "peakElasticEnergy": 147.90881155125078,
+          "positiveWorkPerDistance": 1.3866451082949598,
+          "forceTimeCostIndex": 4.5061556050965565
+        },
+        "lambda": 0.39437091810146097,
+        "maxDrop": 0.14
+      },
+      {
+        "name": "preset humanLowStiffness",
+        "p": {
+          "m": 80,
+          "L0": 1,
+          "k": 8000,
+          "g": 9.81,
+          "legAngleDeg": 58.5208436352711,
+          "retractionDegPerS": 0
+        },
+        "apex": {
+          "y": 0.858785695685612,
+          "vx": 4.14631964421355
+        },
+        "firstStride": {
+          "exitReason": "cycleLimit",
+          "events": [
+            {
+              "time": 0.034844954297600851,
+              "guard": "touchdown"
+            },
+            {
+              "time": 0.29848837902290831,
+              "guard": "takeoff"
+            },
+            {
+              "time": 0.33333333333435644,
+              "guard": "apex"
+            }
+          ]
+        },
+        "exitReason": "cycleLimit",
+        "apexSequence": [
+          {
+            "y": 0.858785695685612,
+            "vx": 4.14631964421355
+          },
+          {
+            "y": 0.85878569568592544,
+            "vx": 4.14631964433245
+          }
+        ],
+        "metrics": {
+          "period": 0.33333333333435644,
+          "contactTime": 0.26364342472530744,
+          "flightTime": 0.069689908609049,
+          "stepLength": 1.3333333333377895,
+          "meanSpeed": 4.0000000000010907,
+          "touchdownAngleDeg": 58.520843635271106,
+          "takeoffAngleDeg": 121.47915636521454,
+          "legCompression": 0.20064898347446014,
+          "peakLegForceBW": 2.0453515135011227,
+          "peakVerticalForceBW": 2.0453514880134835,
+          "peakBrakingForceBW": 0.43101659277230364,
+          "comDropStance": 0.053479181150776767,
+          "peakElasticEnergy": 161.04005827733673,
+          "positiveWorkPerDistance": 1.5097505463449861,
+          "forceTimeCostIndex": 3.793001858635046
+        },
+        "lambda": -0.587454607838267,
+        "maxDrop": 0.03
+      },
+      {
+        "name": "preset humanHighStiffness",
+        "p": {
+          "m": 80,
+          "L0": 1,
+          "k": 20000,
+          "g": 9.81,
+          "legAngleDeg": 69.553748982454,
+          "retractionDegPerS": 0
+        },
+        "apex": {
+          "y": 0.966940033581004,
+          "vx": 4.0617934584961
+        },
+        "firstStride": {
+          "exitReason": "cycleLimit",
+          "events": [
+            {
+              "time": 0.078127588655264715,
+              "guard": "touchdown"
+            },
+            {
+              "time": 0.25520574469298468,
+              "guard": "takeoff"
+            },
+            {
+              "time": 0.33333333333325854,
+              "guard": "apex"
+            }
+          ]
+        },
+        "exitReason": "cycleLimit",
+        "apexSequence": [
+          {
+            "y": 0.966940033581004,
+            "vx": 4.0617934584961
+          },
+          {
+            "y": 0.966940033580964,
+            "vx": 4.0617934583402242
+          }
+        ],
+        "metrics": {
+          "period": 0.33333333333325854,
+          "contactTime": 0.17707815603771998,
+          "flightTime": 0.15625517729553856,
+          "stepLength": 1.3333333333330086,
+          "meanSpeed": 3.9999999999999232,
+          "touchdownAngleDeg": 69.553748982454,
+          "takeoffAngleDeg": 110.44625101566767,
+          "legCompression": 0.11698834011401182,
+          "peakLegForceBW": 2.9813542332826657,
+          "peakVerticalForceBW": 2.9813542020065897,
+          "peakBrakingForceBW": 0.39963391068473708,
+          "comDropStance": 0.053988654823236115,
+          "peakElasticEnergy": 136.86271722631707,
+          "positiveWorkPerDistance": 1.2830879739970349,
+          "forceTimeCostIndex": 5.6472239285515649
+        },
+        "lambda": 0.80752783488569069,
+        "maxDrop": 0.25
+      },
+      {
+        "name": "human, apex +2 cm",
+        "p": {
+          "m": 80,
+          "L0": 1,
+          "k": 12000,
+          "g": 9.81,
+          "legAngleDeg": 64.0065624878925,
+          "retractionDegPerS": 0
+        },
+        "apex": {
+          "y": 0.934065973548051,
+          "vx": 4.09997094485603
+        },
+        "firstStride": {
+          "exitReason": "cycleLimit",
+          "events": [
+            {
+              "time": 0.084739480139174927,
+              "guard": "touchdown"
+            },
+            {
+              "time": 0.31107415171101921,
+              "guard": "takeoff"
+            },
+            {
+              "time": 0.38938913339265468,
+              "guard": "apex"
+            }
+          ]
+        },
+        "exitReason": "cycleLimit",
+        "apexSequence": [
+          {
+            "y": 0.934065973548051,
+            "vx": 4.09997094485603
+          },
+          {
+            "y": 0.92197034576766146,
+            "vx": 4.1288107205692315
+          },
+          {
+            "y": 0.91470813356244973,
+            "vx": 4.1460297357635909
+          },
+          {
+            "y": 0.91164808745308767,
+            "vx": 4.153263858246846
+          },
+          {
+            "y": 0.91078012701546274,
+            "vx": 4.1553134734486354
+          },
+          {
+            "y": 0.91059324583900214,
+            "vx": 4.1557546453130474
+          }
+        ],
+        "metrics": [],
+        "lambda": [],
+        "maxDrop": []
+      },
+      {
+        "name": "human, retraction 60 deg/s",
+        "p": {
+          "m": 80,
+          "L0": 1,
+          "k": 12000,
+          "g": 9.81,
+          "legAngleDeg": 64.0065624878925,
+          "retractionDegPerS": 60
+        },
+        "apex": {
+          "y": 0.914065973548051,
+          "vx": 4.09997094485603
+        },
+        "firstStride": {
+          "exitReason": "cycleLimit",
+          "events": [
+            {
+              "time": 0.026445930018644769,
+              "guard": "touchdown"
+            },
+            {
+              "time": 0.23880118483935003,
+              "guard": "takeoff"
+            },
+            {
+              "time": 0.25411893352317877,
+              "guard": "apex"
+            }
+          ]
+        },
+        "exitReason": "cycleLimit",
+        "apexSequence": [
+          {
+            "y": 0.914065973548051,
+            "vx": 4.09997094485603
+          },
+          {
+            "y": 0.90033353747067568,
+            "vx": 4.13269792559231
+          },
+          {
+            "y": 0.91637346901766525,
+            "vx": 4.0944460782136671
+          },
+          {
+            "y": 0.89806184058632943,
+            "vx": 4.138086856640963
+          }
+        ],
+        "metrics": [],
+        "lambda": [],
+        "maxDrop": []
+      },
+      {
+        "name": "legacy fast retraction",
+        "p": {
+          "m": 80,
+          "k": 50000,
+          "L0": 1,
+          "g": 9.81,
+          "legAngleDeg": 22.169779893831191,
+          "retractionDegPerS": 659.19738194991373
+        },
+        "apex": {
+          "y": 0.998622,
+          "vx": 5
+        },
+        "firstStride": {
+          "exitReason": "cycleLimit",
+          "events": [
+            {
+              "time": 0.08046143237620848,
+              "guard": "touchdown"
+            },
+            {
+              "time": 0.18394002646925378,
+              "guard": "takeoff"
+            },
+            {
+              "time": 0.26440251803507181,
+              "guard": "apex"
+            }
+          ]
+        },
+        "exitReason": "cycleLimit",
+        "apexSequence": [
+          {
+            "y": 0.998622,
+            "vx": 5
+          },
+          {
+            "y": 0.99862336837440158,
+            "vx": 4.9999973157083923
+          },
+          {
+            "y": 0.99861969604873069,
+            "vx": 5.000004521226102
+          },
+          {
+            "y": 0.99862955163864453,
+            "vx": 4.9999851850375912
+          }
+        ],
+        "metrics": [],
+        "lambda": [],
+        "maxDrop": []
+      },
+      {
+        "name": "leg too steep for the apex",
+        "p": {
+          "m": 80,
+          "L0": 1,
+          "k": 12000,
+          "g": 9.81,
+          "legAngleDeg": 85,
+          "retractionDegPerS": 0
+        },
+        "apex": {
+          "y": 0.914065973548051,
+          "vx": 4.09997094485603
+        },
+        "firstStride": {
+          "exitReason": "terminal:footBelowGround",
+          "events": {
+            "time": 0,
+            "guard": "footBelowGround"
+          }
+        },
+        "exitReason": "terminal:footBelowGround",
+        "apexSequence": {
+          "y": 0.914065973548051,
+          "vx": 4.09997094485603
+        },
+        "metrics": [],
+        "lambda": [],
+        "maxDrop": []
+      },
+      {
+        "name": "leg too compliant",
+        "p": {
+          "m": 80,
+          "L0": 1,
+          "k": 3000,
+          "g": 9.81,
+          "legAngleDeg": 64.0065624878925,
+          "retractionDegPerS": 0
+        },
+        "apex": {
+          "y": 0.914065973548051,
+          "vx": 4.09997094485603
+        },
+        "firstStride": {
+          "exitReason": "cycleLimit",
+          "events": [
+            {
+              "time": 0.055707338177994115,
+              "guard": "touchdown"
+            },
+            {
+              "time": 0.36508752416458196,
+              "guard": "takeoff"
+            },
+            {
+              "time": 0.36508752416458196,
+              "guard": "apex"
+            }
+          ]
+        },
+        "exitReason": "cycleLimit",
+        "apexSequence": [
+          {
+            "y": 0.914065973548051,
+            "vx": 4.09997094485603
+          },
+          {
+            "y": 0.51025146873303817,
+            "vx": 4.5533988543683481
+          }
+        ],
+        "metrics": [],
+        "lambda": [],
+        "maxDrop": []
+      },
+      {
+        "name": "leg too shallow",
+        "p": {
+          "m": 80,
+          "L0": 1,
+          "k": 12000,
+          "g": 9.81,
+          "legAngleDeg": 40,
+          "retractionDegPerS": 0
+        },
+        "apex": {
+          "y": 0.914065973548051,
+          "vx": 4.09997094485603
+        },
+        "firstStride": {
+          "exitReason": "terminal:reversal",
+          "events": [
+            {
+              "time": 0.23517333224688625,
+              "guard": "touchdown"
+            },
+            {
+              "time": 0.37687672994084248,
+              "guard": "reversal"
+            }
+          ]
+        },
+        "exitReason": "terminal:reversal",
+        "apexSequence": {
+          "y": 0.914065973548051,
+          "vx": 4.09997094485603
+        },
+        "metrics": [],
+        "lambda": [],
+        "maxDrop": []
+      }
+    ],
+    "family": {
+      "target": {
+        "meanSpeed": 3.99999999999987,
+        "hold": "stepFrequency",
+        "stepFrequency": 3.00000000000401
+      },
+      "rows": [
+        {
+          "k": 6000,
+          "relativeStiffness": 7.64525993883792,
+          "legAngleDeg": 53.891508942327242,
+          "apexHeight": 0.80957268952921257,
+          "apexSpeed": 4.1918690093854591,
+          "meanSpeed": 3.9999999999998659,
+          "contactTime": 0.2964282802392616,
+          "flightTime": 0.036905053093623408,
+          "stepFrequency": 3.000000000004035,
+          "stepLength": 1.3333333333314954,
+          "dutyFactor": 0.44464242035949042,
+          "touchdownAngleDeg": 53.891508942327242,
+          "sweepAngleDeg": 72.216982115313016,
+          "legCompressionPct": 24.104242790477461,
+          "comDropStance": 0.04894499624859272,
+          "peakVerticalForceBW": 1.8428319923690817,
+          "peakLegForceBW": 1.8428320176206008,
+          "peakBrakingForceBW": 0.44954334121388395,
+          "peakElasticEnergy": 174.30435615068538,
+          "positiveWorkPerDistance": 1.634103338914928,
+          "forceTimeCostIndex": 3.37349728977563,
+          "lambda": -3.0645097626530449,
+          "maxDrop": 0
+        },
+        {
+          "k": 7000,
+          "relativeStiffness": 8.91946992864424,
+          "legAngleDeg": 56.457609988484442,
+          "apexHeight": 0.83715760499326053,
+          "apexSpeed": 4.1659024704052463,
+          "meanSpeed": 4.0000000000051807,
+          "contactTime": 0.278549100242455,
+          "flightTime": 0.054784233095603319,
+          "stepFrequency": 2.9999999999574753,
+          "stepLength": 1.3333333333539603,
+          "dutyFactor": 0.41782365035775987,
+          "touchdownAngleDeg": 56.457609988484442,
+          "sweepAngleDeg": 67.084780023028088,
+          "legCompressionPct": 21.822397754175562,
+          "comDropStance": 0.051701233599174112,
+          "peakVerticalForceBW": 1.94644218013691,
+          "peakLegForceBW": 1.946442205392825,
+          "peakBrakingForceBW": 0.43881296907102457,
+          "peakElasticEnergy": 166.6759653095063,
+          "positiveWorkPerDistance": 1.562587174752448,
+          "forceTimeCostIndex": 3.5900313414388307,
+          "lambda": -1.3349632972120551,
+          "maxDrop": 0
+        },
+        {
+          "k": 8000,
+          "relativeStiffness": 10.19367991845056,
+          "legAngleDeg": 58.520843635386711,
+          "apexHeight": 0.85878569568615026,
+          "apexSpeed": 4.1463196442075025,
+          "meanSpeed": 4.0000000000010223,
+          "contactTime": 0.26364342472494245,
+          "flightTime": 0.069689908609019413,
+          "stepFrequency": 2.9999999999943432,
+          "stepLength": 1.3333333333361883,
+          "dutyFactor": 0.395465137086668,
+          "touchdownAngleDeg": 58.520843635386711,
+          "sweepAngleDeg": 62.958312729813585,
+          "legCompressionPct": 20.064898347217984,
+          "comDropStance": 0.053479181149551192,
+          "peakVerticalForceBW": 2.0453514879902364,
+          "peakLegForceBW": 2.0453515134778781,
+          "peakBrakingForceBW": 0.43101659276500665,
+          "peakElasticEnergy": 161.04005827367644,
+          "positiveWorkPerDistance": 1.5097505463124838,
+          "forceTimeCostIndex": 3.7930018586402969,
+          "lambda": -0.58745454968589517,
+          "maxDrop": 0.03
+        },
+        {
+          "k": 9000,
+          "relativeStiffness": 11.467889908256879,
+          "legAngleDeg": 60.228838423551828,
+          "apexHeight": 0.87633484334348966,
+          "apexSpeed": 4.1309911101207639,
+          "meanSpeed": 3.9999999999998406,
+          "contactTime": 0.25096591472457452,
+          "flightTime": 0.082367418608293774,
+          "stepFrequency": 3.0000000000041855,
+          "stepLength": 1.3333333333314201,
+          "dutyFactor": 0.376448872087387,
+          "touchdownAngleDeg": 60.228838423551828,
+          "sweepAngleDeg": 59.5423231514766,
+          "legCompressionPct": 18.659486972359929,
+          "comDropStance": 0.054610362625693409,
+          "peakVerticalForceBW": 2.1398493975929829,
+          "peakLegForceBW": 2.1398494234357712,
+          "peakBrakingForceBW": 0.42507642680383989,
+          "peakElasticEnergy": 156.67940433225144,
+          "positiveWorkPerDistance": 1.468869415616965,
+          "forceTimeCostIndex": 3.9846048460304329,
+          "lambda": -0.17398143703828417,
+          "maxDrop": 0.05
+        },
+        {
+          "k": 10000,
+          "relativeStiffness": 12.7420998980632,
+          "legAngleDeg": 61.674381209108866,
+          "apexHeight": 0.89094519503443714,
+          "apexSpeed": 4.1186490446265065,
+          "meanSpeed": 4.000000000001263,
+          "contactTime": 0.24000913254761486,
+          "flightTime": 0.093324200786544909,
+          "stepFrequency": 2.9999999999925619,
+          "stepLength": 1.33333333333706,
+          "dutyFactor": 0.36001369882052969,
+          "touchdownAngleDeg": 61.674381209108866,
+          "sweepAngleDeg": 56.651237581738364,
+          "legCompressionPct": 17.503601872429396,
+          "comDropStance": 0.055301313812854858,
+          "peakVerticalForceBW": 2.2303264100756888,
+          "peakLegForceBW": 2.2303264363442143,
+          "peakBrakingForceBW": 0.42038856160801946,
+          "peakElasticEnergy": 153.18803925425695,
+          "positiveWorkPerDistance": 1.4361378680046448,
+          "forceTimeCostIndex": 4.1665081215258022,
+          "lambda": 0.086728453954632023,
+          "maxDrop": 0.08
+        },
+        {
+          "k": 11000,
+          "relativeStiffness": 14.01630988786952,
+          "legAngleDeg": 62.919275622005394,
+          "apexHeight": 0.90335490797267048,
+          "apexSpeed": 4.10848814402454,
+          "meanSpeed": 3.99999999999787,
+          "contactTime": 0.23041407645799469,
+          "flightTime": 0.10291925687307299,
+          "stepFrequency": 3.0000000000203908,
+          "stepLength": 1.3333333333235609,
+          "dutyFactor": 0.3456211146893412,
+          "touchdownAngleDeg": 62.919275622005394,
+          "sweepAngleDeg": 54.161448755893794,
+          "legCompressionPct": 16.531952550482387,
+          "comDropStance": 0.055685545182136864,
+          "peakVerticalForceBW": 2.3171696732557505,
+          "peakLegForceBW": 2.31716969999116,
+          "peakBrakingForceBW": 0.41658746896819282,
+          "peakElasticEnergy": 150.31800032227062,
+          "positiveWorkPerDistance": 1.409231253031616,
+          "forceTimeCostIndex": 4.340012621504501,
+          "lambda": 0.26516199330028911,
+          "maxDrop": 0.11
+        },
+        {
+          "k": 12000,
+          "relativeStiffness": 15.290519877675839,
+          "legAngleDeg": 64.0065624878925,
+          "apexHeight": 0.914065973548051,
+          "apexSpeed": 4.09997094485603,
+          "meanSpeed": 3.9999999999998446,
+          "contactTime": 0.22191865697424629,
+          "flightTime": 0.11141467635862312,
+          "stepFrequency": 3.0000000000041753,
+          "stepLength": 1.3333333333314259,
+          "dutyFactor": 0.33287798546183273,
+          "touchdownAngleDeg": 64.0065624878925,
+          "sweepAngleDeg": 51.986875023529436,
+          "legCompressionPct": 15.700786156073566,
+          "comDropStance": 0.055852121249651887,
+          "peakVerticalForceBW": 2.4007318009196039,
+          "peakLegForceBW": 2.4007318281458048,
+          "peakBrakingForceBW": 0.41343814101069631,
+          "peakElasticEnergy": 147.90881155125078,
+          "positiveWorkPerDistance": 1.3866451082949598,
+          "forceTimeCostIndex": 4.5061556050965565,
+          "lambda": 0.39437091810146097,
+          "maxDrop": 0.14
+        },
+        {
+          "k": 13000,
+          "relativeStiffness": 16.564729867482161,
+          "legAngleDeg": 64.967295966415492,
+          "apexHeight": 0.92343334324892423,
+          "apexSpeed": 4.0927243746466315,
+          "meanSpeed": 3.9999999999998685,
+          "contactTime": 0.21432646294483002,
+          "flightTime": 0.11900687038805205,
+          "stepFrequency": 3.0000000000040616,
+          "stepLength": 1.3333333333314845,
+          "dutyFactor": 0.32148969441768027,
+          "touchdownAngleDeg": 64.967295966415492,
+          "sweepAngleDeg": 50.065408067646842,
+          "legCompressionPct": 14.979564137287138,
+          "comDropStance": 0.055862062711656835,
+          "peakVerticalForceBW": 2.4813243069375654,
+          "peakLegForceBW": 2.4813243346678489,
+          "peakBrakingForceBW": 0.41078281144467443,
+          "peakElasticEnergy": 145.85177213301432,
+          "positiveWorkPerDistance": 1.3673603637489051,
+          "forceTimeCostIndex": 4.6657794201428642,
+          "lambda": 0.49187528928906765,
+          "maxDrop": 0.14
+        },
+        {
+          "k": 14000,
+          "relativeStiffness": 17.83893985728848,
+          "legAngleDeg": 65.824538590078944,
+          "apexHeight": 0.9317160803919835,
+          "apexSpeed": 4.0864810395444584,
+          "meanSpeed": 4.0000000000029452,
+          "contactTime": 0.20748700737449044,
+          "flightTime": 0.12584632596121098,
+          "stepFrequency": 2.9999999999786873,
+          "stepLength": 1.3333333333437876,
+          "dutyFactor": 0.31123051105952459,
+          "touchdownAngleDeg": 65.824538590078944,
+          "sweepAngleDeg": 48.350922820661026,
+          "legCompressionPct": 14.34625299579727,
+          "comDropStance": 0.055758133429982037,
+          "peakVerticalForceBW": 2.5592194154538181,
+          "peakLegForceBW": 2.559219443694722,
+          "peakBrakingForceBW": 0.408510728390078,
+          "peakElasticEnergy": 144.07048251359552,
+          "positiveWorkPerDistance": 1.3506607735543679,
+          "forceTimeCostIndex": 4.8195788866678955,
+          "lambda": 0.56781328342470072,
+          "maxDrop": 0.17
+        },
+        {
+          "k": 15000,
+          "relativeStiffness": 19.1131498470948,
+          "legAngleDeg": 66.595835226418842,
+          "apexHeight": 0.93910830378670163,
+          "apexSpeed": 4.0810441037087273,
+          "meanSpeed": 3.9999999999998641,
+          "contactTime": 0.20128277982787507,
+          "flightTime": 0.13205055350500378,
+          "stepFrequency": 3.0000000000040905,
+          "stepLength": 1.33333333333147,
+          "dutyFactor": 0.30192416974222425,
+          "touchdownAngleDeg": 66.595835226418842,
+          "sweepAngleDeg": 46.808329548652978,
+          "legCompressionPct": 13.784512092292434,
+          "comDropStance": 0.05557088530398957,
+          "peakVerticalForceBW": 2.6346544231370759,
+          "peakLegForceBW": 2.6346544518907558,
+          "peakBrakingForceBW": 0.4065430066519336,
+          "peakElasticEnergy": 142.50958021691724,
+          "positiveWorkPerDistance": 1.336027314535466,
+          "forceTimeCostIndex": 4.9681348839435735,
+          "lambda": 0.62844834254893733,
+          "maxDrop": 0.22
+        },
+        {
+          "k": 16000,
+          "relativeStiffness": 20.387359836901119,
+          "legAngleDeg": 67.294808186873126,
+          "apexHeight": 0.94575873392343457,
+          "apexSpeed": 4.0762653555894079,
+          "meanSpeed": 3.9999999999998925,
+          "contactTime": 0.19562049751575283,
+          "flightTime": 0.13771283581715743,
+          "stepFrequency": 3.0000000000038076,
+          "stepLength": 1.3333333333316053,
+          "dutyFactor": 0.29343074627400167,
+          "touchdownAngleDeg": 67.294808186873126,
+          "sweepAngleDeg": 45.41038362744294,
+          "legCompressionPct": 13.281938038858797,
+          "comDropStance": 0.055322506849608377,
+          "peakVerticalForceBW": 2.7078364720306953,
+          "peakLegForceBW": 2.7078365012963905,
+          "peakBrakingForceBW": 0.40482049097970579,
+          "peakElasticEnergy": 141.12790245446743,
+          "positiveWorkPerDistance": 1.3230740855123468,
+          "forceTimeCostIndex": 5.1119387421017706,
+          "lambda": 0.67784975094464794,
+          "maxDrop": 0.2
+        },
+        {
+          "k": 17000,
+          "relativeStiffness": 21.661569826707439,
+          "legAngleDeg": 67.932221094475381,
+          "apexHeight": 0.95178349523787675,
+          "apexSpeed": 4.0720310054334483,
+          "meanSpeed": 3.9999999999996954,
+          "contactTime": 0.19042503570186667,
+          "flightTime": 0.14290829763086124,
+          "stepFrequency": 3.000000000005449,
+          "stepLength": 1.3333333333308102,
+          "dutyFactor": 0.28563755355331882,
+          "touchdownAngleDeg": 67.932221094475381,
+          "sweepAngleDeg": 44.135557816896309,
+          "legCompressionPct": 12.828927101192978,
+          "comDropStance": 0.055029339755573226,
+          "peakVerticalForceBW": 2.7789469722672235,
+          "peakLegForceBW": 2.7789470020423117,
+          "peakBrakingForceBW": 0.40329909589483015,
+          "peakElasticEnergy": 139.89416498256512,
+          "positiveWorkPerDistance": 1.3115077967140298,
+          "forceTimeCostIndex": 5.2514103322297414,
+          "lambda": 0.71877728581026812,
+          "maxDrop": 0.21000000000000002
+        },
+        {
+          "k": 18000,
+          "relativeStiffness": 22.935779816513758,
+          "legAngleDeg": 68.5167091603864,
+          "apexHeight": 0.9572747636592629,
+          "apexSpeed": 4.0682522030024542,
+          "meanSpeed": 4.0000000000004281,
+          "contactTime": 0.18563511894978021,
+          "flightTime": 0.14769821438363859,
+          "stepFrequency": 2.9999999999992308,
+          "stepLength": 1.333333333333818,
+          "dutyFactor": 0.27845267842459892,
+          "touchdownAngleDeg": 68.5167091603864,
+          "sweepAngleDeg": 42.966581683575484,
+          "legCompressionPct": 12.417914331418334,
+          "comDropStance": 0.054703563743933148,
+          "peakVerticalForceBW": 2.8481454585769783,
+          "peakLegForceBW": 2.848145488857416,
+          "peakBrakingForceBW": 0.40194403660526107,
+          "peakElasticEnergy": 138.78413670820035,
+          "positiveWorkPerDistance": 1.3011012816389054,
+          "forceTimeCostIndex": 5.386911731236208,
+          "lambda": 0.75316494688115743,
+          "maxDrop": 0.23
+        },
+        {
+          "k": 19000,
+          "relativeStiffness": 24.209989806320081,
+          "legAngleDeg": 69.055293147622791,
+          "apexHeight": 0.96230676508394442,
+          "apexSpeed": 4.0648585341390682,
+          "meanSpeed": 3.9999999999983933,
+          "contactTime": 0.18120019970577672,
+          "flightTime": 0.15213313362946013,
+          "stepFrequency": 2.9999999999828684,
+          "stepLength": 1.3333333333404118,
+          "dutyFactor": 0.27180029955711293,
+          "touchdownAngleDeg": 69.055293147622791,
+          "sweepAngleDeg": 41.8894137065234,
+          "legCompressionPct": 12.042850520185034,
+          "comDropStance": 0.054354348288477516,
+          "peakVerticalForceBW": 2.9155728525462119,
+          "peakLegForceBW": 2.9155728833271612,
+          "peakBrakingForceBW": 0.40072985597463306,
+          "peakElasticEnergy": 137.77873621894489,
+          "positiveWorkPerDistance": 1.2916756520457511,
+          "forceTimeCostIndex": 5.5187577145265125,
+          "lambda": 0.7824055801503027,
+          "maxDrop": 0.27
+        },
+        {
+          "k": 20000,
+          "relativeStiffness": 25.4841997961264,
+          "legAngleDeg": 69.55374898251516,
+          "apexHeight": 0.9669400335827617,
+          "apexSpeed": 4.0617934584966848,
+          "meanSpeed": 3.9999999999988196,
+          "contactTime": 0.17707815603781044,
+          "flightTime": 0.15625517729427338,
+          "stepFrequency": 3.0000000000112457,
+          "stepLength": 1.3333333333279418,
+          "dutyFactor": 0.26561723405771132,
+          "touchdownAngleDeg": 69.55374898251516,
+          "sweepAngleDeg": 40.892502033255383,
+          "legCompressionPct": 11.698834011485514,
+          "comDropStance": 0.053988654824451365,
+          "peakVerticalForceBW": 2.981354202028085,
+          "peakLegForceBW": 2.9813542333041574,
+          "peakBrakingForceBW": 0.399633910685396,
+          "peakElasticEnergy": 136.86271722829028,
+          "positiveWorkPerDistance": 1.2830879740204097,
+          "forceTimeCostIndex": 5.64722392854868,
+          "lambda": 0.80752843476528113,
+          "maxDrop": 0.25
+        },
+        {
+          "k": 21000,
+          "relativeStiffness": 26.75840978593272,
+          "legAngleDeg": 70.016878731310541,
+          "apexHeight": 0.9712244964374499,
+          "apexSpeed": 4.0590110409932674,
+          "meanSpeed": 3.9999999999996003,
+          "contactTime": 0.17323356598352463,
+          "flightTime": 0.16009976734921011,
+          "stepFrequency": 3.0000000000053872,
+          "stepLength": 1.3333333333308057,
+          "dutyFactor": 0.2598503489757536,
+          "touchdownAngleDeg": 70.016878731310541,
+          "sweepAngleDeg": 39.966242539974672,
+          "legCompressionPct": 11.381846001154116,
+          "comDropStance": 0.053611804784965744,
+          "peakVerticalForceBW": 3.0456009624270477,
+          "peakLegForceBW": 3.0456009941926152,
+          "peakBrakingForceBW": 0.39863974632432897,
+          "peakElasticEnergy": 136.02373931368737,
+          "positiveWorkPerDistance": 1.2752225560682364,
+          "forceTimeCostIndex": 5.7725533404715863,
+          "lambda": 0.82930840152151131,
+          "maxDrop": 0.25
+        },
+        {
+          "k": 22000,
+          "relativeStiffness": 28.03261977573904,
+          "legAngleDeg": 70.448712631181508,
+          "apexHeight": 0.97520174985768882,
+          "apexSpeed": 4.0564735691784479,
+          "meanSpeed": 4.0000000000005391,
+          "contactTime": 0.16963639528230806,
+          "flightTime": 0.16369693805134905,
+          "stepFrequency": 2.9999999999970859,
+          "stepLength": 1.3333333333348083,
+          "dutyFactor": 0.25445459292321493,
+          "touchdownAngleDeg": 70.448712631181508,
+          "sweepAngleDeg": 39.102574743708942,
+          "legCompressionPct": 11.088556694792951,
+          "comDropStance": 0.053227887966387555,
+          "peakVerticalForceBW": 3.10841290461943,
+          "peakLegForceBW": 3.1084129368685636,
+          "peakBrakingForceBW": 0.39773324680349581,
+          "peakElasticEnergy": 135.25169853100132,
+          "positiveWorkPerDistance": 1.2679846737267348,
+          "forceTimeCostIndex": 5.8949613868875534,
+          "lambda": 0.84834174439440968,
+          "maxDrop": 0.27
+        },
+        {
+          "k": 23000,
+          "relativeStiffness": 29.306829765545359,
+          "legAngleDeg": 70.852662008149139,
+          "apexHeight": 0.97890676491382289,
+          "apexSpeed": 4.05414978862618,
+          "meanSpeed": 4.0000000001240528,
+          "contactTime": 0.16626098633321174,
+          "flightTime": 0.16707234712214047,
+          "stepFrequency": 2.99999999890183,
+          "stepLength": 1.3333333338627598,
+          "dutyFactor": 0.24939147940852621,
+          "touchdownAngleDeg": 70.852662008149139,
+          "sweepAngleDeg": 38.294675889196526,
+          "legCompressionPct": 10.816180987313428,
+          "comDropStance": 0.052840060073808814,
+          "peakVerticalForceBW": 3.1698797163596524,
+          "peakLegForceBW": 3.1698797490852297,
+          "peakBrakingForceBW": 0.39690310932835327,
+          "peakElasticEnergy": 134.53823682286856,
+          "positiveWorkPerDistance": 1.2612959697135702,
+          "forceTimeCostIndex": 6.0146401272746655,
+          "lambda": 0.86509077435292792,
+          "maxDrop": 0.29000000000000004
+        },
+        {
+          "k": 24000,
+          "relativeStiffness": 30.581039755351679,
+          "legAngleDeg": 71.2316369685116,
+          "apexHeight": 0.98236918545152208,
+          "apexSpeed": 4.0520135600922353,
+          "meanSpeed": 3.9999999999647509,
+          "contactTime": 0.16308526965191089,
+          "flightTime": 0.17024806364628658,
+          "stepFrequency": 3.0000000003162226,
+          "stepLength": 1.3333333331810402,
+          "dutyFactor": 0.24462790450365196,
+          "touchdownAngleDeg": 71.2316369685116,
+          "sweepAngleDeg": 37.53672605042847,
+          "legCompressionPct": 10.562369149970397,
+          "comDropStance": 0.052450761698511261,
+          "peakVerticalForceBW": 3.230082275661498,
+          "peakLegForceBW": 3.2300823088594481,
+          "peakBrakingForceBW": 0.39613917409140814,
+          "peakElasticEnergy": 133.87637047229563,
+          "positiveWorkPerDistance": 1.255090973321128,
+          "forceTimeCostIndex": 6.1317616369301744,
+          "lambda": 0.87992409317894094,
+          "maxDrop": 0.32999999999999996
+        },
+        {
+          "k": 25000,
+          "relativeStiffness": 31.855249745157998,
+          "legAngleDeg": 71.588137064560541,
+          "apexHeight": 0.98561432721644049,
+          "apexSpeed": 4.0500428735019289,
+          "meanSpeed": 4.0000000000001563,
+          "contactTime": 0.16009014296444535,
+          "flightTime": 0.17324319036872876,
+          "stepFrequency": 3.0000000000014331,
+          "stepLength": 1.3333333333327486,
+          "dutyFactor": 0.24013521444678274,
+          "touchdownAngleDeg": 71.588137064560541,
+          "sweepAngleDeg": 36.823725872543932,
+          "legCompressionPct": 10.3251236539324,
+          "comDropStance": 0.052061882748673183,
+          "peakVerticalForceBW": 3.2890938927929407,
+          "peakLegForceBW": 3.2890939264565491,
+          "peakBrakingForceBW": 0.39543455307828335,
+          "peakElasticEnergy": 133.26022308624295,
+          "positiveWorkPerDistance": 1.2493145914340755,
+          "forceTimeCostIndex": 6.2464807731609779,
+          "lambda": 0.89313454263606484,
+          "maxDrop": 0.29000000000000004
+        },
+        {
+          "k": 26000,
+          "relativeStiffness": 33.129459734964321,
+          "legAngleDeg": 71.924323488915263,
+          "apexHeight": 0.9886639581871387,
+          "apexSpeed": 4.0482190425264841,
+          "meanSpeed": 4.0000000000000471,
+          "contactTime": 0.15725897618853571,
+          "flightTime": 0.17607435714453193,
+          "stepFrequency": 3.0000000000023914,
+          "stepLength": 1.3333333333322863,
+          "dutyFactor": 0.23588846428299159,
+          "touchdownAngleDeg": 71.924323488915263,
+          "sweepAngleDeg": 36.151353016189915,
+          "legCompressionPct": 10.102733989047541,
+          "comDropStance": 0.051674884928917919,
+          "peakVerticalForceBW": 3.3469811549089452,
+          "peakLegForceBW": 3.3469811890320593,
+          "peakBrakingForceBW": 0.39478158562041543,
+          "peakElasticEnergy": 132.68480426949338,
+          "positiveWorkPerDistance": 1.2439200400274772,
+          "forceTimeCostIndex": 6.3589374942967529,
+          "lambda": 0.90496031956821543,
+          "maxDrop": 0.29000000000000004
+        },
+        {
+          "k": 27000,
+          "relativeStiffness": 34.403669724770637,
+          "legAngleDeg": 72.24207581081609,
+          "apexHeight": 0.99153691290996937,
+          "apexSpeed": 4.046526104103557,
+          "meanSpeed": 4.0000000000001128,
+          "contactTime": 0.15457721421331763,
+          "flightTime": 0.17875611911985054,
+          "stepFrequency": 3.0000000000014864,
+          "stepLength": 1.3333333333327102,
+          "dutyFactor": 0.23186582132009134,
+          "touchdownAngleDeg": 72.24207581081609,
+          "sweepAngleDeg": 35.515848381187325,
+          "legCompressionPct": 9.8937259711772363,
+          "comDropStance": 0.051290895694247163,
+          "peakVerticalForceBW": 3.4038047720207039,
+          "peakLegForceBW": 3.4038048065976731,
+          "peakBrakingForceBW": 0.39417503826787859,
+          "peakElasticEnergy": 132.14584835020838,
+          "positiveWorkPerDistance": 1.2388673282837825,
+          "forceTimeCostIndex": 6.4692587784639013,
+          "lambda": 0.91559662156459609,
+          "maxDrop": 0.31
+        },
+        {
+          "k": 28000,
+          "relativeStiffness": 35.67787971457696,
+          "legAngleDeg": 72.543037566542381,
+          "apexHeight": 0.9942495817664414,
+          "apexSpeed": 4.0449503398728988,
+          "meanSpeed": 4.0000000000003064,
+          "contactTime": 0.15203205497879174,
+          "flightTime": 0.18130127835456783,
+          "stepFrequency": 2.9999999999997637,
+          "stepLength": 1.3333333333335404,
+          "dutyFactor": 0.22804808246816966,
+          "touchdownAngleDeg": 72.543037566542381,
+          "sweepAngleDeg": 34.913924869658914,
+          "legCompressionPct": 9.6968214927589553,
+          "comDropStance": 0.050910780073524231,
+          "peakVerticalForceBW": 3.4596202732987598,
+          "peakLegForceBW": 3.4596203083237862,
+          "peakBrakingForceBW": 0.39360916730450829,
+          "peakElasticEnergy": 131.63968588740482,
+          "positiveWorkPerDistance": 1.2341220551942287,
+          "forceTimeCostIndex": 6.5775602397763988,
+          "lambda": 0.92519638608012933,
+          "maxDrop": 0.32999999999999996
+        },
+        {
+          "k": 29000,
+          "relativeStiffness": 36.952089704383276,
+          "legAngleDeg": 72.8286532040411,
+          "apexHeight": 0.99681630414964373,
+          "apexSpeed": 4.0434798916869443,
+          "meanSpeed": 3.9999999999999218,
+          "contactTime": 0.14961218656184155,
+          "flightTime": 0.18372114677112533,
+          "stepFrequency": 3.0000000000032983,
+          "stepLength": 1.3333333333318416,
+          "dutyFactor": 0.22441827984300905,
+          "touchdownAngleDeg": 72.8286532040411,
+          "sweepAngleDeg": 34.342693595482771,
+          "legCompressionPct": 9.5109062806721276,
+          "comDropStance": 0.050535196053270837,
+          "peakVerticalForceBW": 3.5144785850662736,
+          "peakLegForceBW": 3.5144786205337875,
+          "peakBrakingForceBW": 0.39308158043711311,
+          "peakElasticEnergy": 131.16314050560632,
+          "positiveWorkPerDistance": 1.2296544422414351,
+          "forceTimeCostIndex": 6.6839474977304363,
+          "lambda": 0.93390222761224884,
+          "maxDrop": 0.35
+        },
+        {
+          "k": 30000,
+          "relativeStiffness": 38.2262996941896,
+          "legAngleDeg": 73.1001980852325,
+          "apexHeight": 0.99924968690276772,
+          "apexSpeed": 4.0421044582538572,
+          "meanSpeed": 3.9999999999993063,
+          "contactTime": 0.14730757100638064,
+          "flightTime": 0.18602576232591733,
+          "stepFrequency": 3.0000000000093183,
+          "stepLength": 1.3333333333289608,
+          "dutyFactor": 0.22096135651025728,
+          "touchdownAngleDeg": 73.1001980852325,
+          "sweepAngleDeg": 33.799603775041078,
+          "legCompressionPct": 9.3350039555187063,
+          "comDropStance": 0.050164637756500929,
+          "peakVerticalForceBW": 3.5684265525970829,
+          "peakLegForceBW": 3.5684265885010342,
+          "peakBrakingForceBW": 0.39258681250782584,
+          "peakElasticEnergy": 130.71344827432483,
+          "positiveWorkPerDistance": 1.2254385775758141,
+          "forceTimeCostIndex": 6.78851733938838,
+          "lambda": 0.94182212477478267,
+          "maxDrop": 0.38
+        },
+        {
+          "k": 31000,
+          "relativeStiffness": 39.500509683995922,
+          "legAngleDeg": 73.358803349559068,
+          "apexHeight": 1.0015608645603451,
+          "apexSpeed": 4.0408150393832729,
+          "meanSpeed": 3.9999999999993845,
+          "contactTime": 0.14510926518794737,
+          "flightTime": 0.18822406814444631,
+          "stepFrequency": 3.0000000000084568,
+          "stepLength": 1.3333333333293695,
+          "dutyFactor": 0.21766389778253464,
+          "touchdownAngleDeg": 73.358803349559068,
+          "sweepAngleDeg": 33.28239330929658,
+          "legCompressionPct": 9.1682548022526511,
+          "comDropStance": 0.049799469051982515,
+          "peakVerticalForceBW": 3.6215073396809054,
+          "peakLegForceBW": 3.6215073760172296,
+          "peakBrakingForceBW": 0.39212206491886009,
+          "peakElasticEnergy": 130.28818898449464,
+          "positiveWorkPerDistance": 1.2214517717332685,
+          "forceTimeCostIndex": 6.89135871996035,
+          "lambda": 0.949049780151201,
+          "maxDrop": 0.32999999999999996
+        },
+        {
+          "k": 32000,
+          "relativeStiffness": 40.774719673802238,
+          "legAngleDeg": 73.605475965241411,
+          "apexHeight": 1.0037597129093752,
+          "apexSpeed": 4.0396037508668572,
+          "meanSpeed": 3.9999999999961342,
+          "contactTime": 0.14300927184085566,
+          "flightTime": 0.19032406148807252,
+          "stepFrequency": 3.0000000000396465,
+          "stepLength": 1.3333333333144242,
+          "dutyFactor": 0.21451390776411838,
+          "touchdownAngleDeg": 73.605475965241411,
+          "sweepAngleDeg": 32.789048059250433,
+          "legCompressionPct": 9.00989867379527,
+          "comDropStance": 0.049439950397858756,
+          "peakVerticalForceBW": 3.6737608903709549,
+          "peakLegForceBW": 3.6737609271336464,
+          "peakBrakingForceBW": 0.39168466291092185,
+          "peakElasticEnergy": 129.88523857929241,
+          "positiveWorkPerDistance": 1.2176741116981351,
+          "forceTimeCostIndex": 6.9925536094808267,
+          "lambda": 0.95566789946155417,
+          "maxDrop": 0.32999999999999996
+        },
+        {
+          "k": 33000,
+          "relativeStiffness": 42.048929663608561,
+          "legAngleDeg": 73.841116116541,
+          "apexHeight": 1.0058550264811059,
+          "apexSpeed": 4.0384636405943919,
+          "meanSpeed": 3.9999999999886735,
+          "contactTime": 0.14100041427815,
+          "flightTime": 0.19233291904273167,
+          "stepFrequency": 3.000000000112065,
+          "stepLength": 1.3333333332797512,
+          "dutyFactor": 0.2115006214251256,
+          "touchdownAngleDeg": 73.841116116541,
+          "sweepAngleDeg": 32.31776777165004,
+          "legCompressionPct": 8.8592604801284942,
+          "comDropStance": 0.049086259555601419,
+          "peakVerticalForceBW": 3.7252241708207254,
+          "peakLegForceBW": 3.7252242080051006,
+          "peakBrakingForceBW": 0.39127254066151868,
+          "peakElasticEnergy": 129.50271882036483,
+          "positiveWorkPerDistance": 1.2140879889897105,
+          "forceTimeCostIndex": 7.0921777437285458,
+          "lambda": 0.961743219369815,
+          "maxDrop": 0.35
+        },
+        {
+          "k": 34000,
+          "relativeStiffness": 43.323139653414877,
+          "legAngleDeg": 74.066531143055613,
+          "apexHeight": 1.0078546658718626,
+          "apexSpeed": 4.0373885648804961,
+          "meanSpeed": 3.9999999999996709,
+          "contactTime": 0.13907623115664158,
+          "flightTime": 0.19425710217604131,
+          "stepFrequency": 3.000000000005854,
+          "stepLength": 1.3333333333306219,
+          "dutyFactor": 0.20861434673536944,
+          "touchdownAngleDeg": 74.066531143055613,
+          "sweepAngleDeg": 31.866937714497666,
+          "legCompressionPct": 8.71573849598104,
+          "comDropStance": 0.0487385085072376,
+          "peakVerticalForceBW": 3.7759315228393371,
+          "peakLegForceBW": 3.7759315604403079,
+          "peakBrakingForceBW": 0.39088341586733705,
+          "peakElasticEnergy": 129.13896580155392,
+          "positiveWorkPerDistance": 1.21067780439203,
+          "forceTimeCostIndex": 7.1903012591252908,
+          "lambda": 0.96733436472540291,
+          "maxDrop": 0.36
+        },
+        {
+          "k": 35000,
+          "relativeStiffness": 44.5973496432212,
+          "legAngleDeg": 74.282447651480481,
+          "apexHeight": 1.0097656815566789,
+          "apexSpeed": 4.0363730686734778,
+          "meanSpeed": 4.0000000000002442,
+          "contactTime": 0.13723088710424652,
+          "flightTime": 0.19610244622905298,
+          "stepFrequency": 3.0000000000003046,
+          "stepLength": 1.3333333333332793,
+          "dutyFactor": 0.20584633065639069,
+          "touchdownAngleDeg": 74.282447651480481,
+          "sweepAngleDeg": 31.435104700050445,
+          "legCompressionPct": 8.578794380173294,
+          "comDropStance": 0.048396756701285626,
+          "peakVerticalForceBW": 3.8259148868860162,
+          "peakLegForceBW": 3.8259149248988944,
+          "peakBrakingForceBW": 0.39051478745410367,
+          "peakElasticEnergy": 128.79249778026255,
+          "positiveWorkPerDistance": 1.2074296666900104,
+          "forceTimeCostIndex": 7.2869892565830074,
+          "lambda": 0.972493756358217,
+          "maxDrop": 0.38
+        }
+      ]
+    }
+  },
+  "ball": {
+    "spec": [
+      {
+        "name": "g",
+        "value": 9.81,
+        "units": "m/s^2",
+        "min": 0,
+        "max": 20,
+        "group": "parameter",
+        "description": "gravitational acceleration"
+      },
+      {
+        "name": "radius",
+        "value": 1,
+        "units": "m",
+        "min": 0.1,
+        "max": 2,
+        "group": "parameter",
+        "description": "ball radius"
+      },
+      {
+        "name": "restitution",
+        "value": 0.8,
+        "units": "-",
+        "min": 0,
+        "max": 1,
+        "group": "contact condition",
+        "description": "fraction of normal speed kept at each impact"
+      },
+      {
+        "name": "restSpeed",
+        "value": 0.01,
+        "units": "m/s",
+        "min": 0,
+        "max": 0.5,
+        "group": "contact condition",
+        "description": "rebound speed below which the ball comes to rest on the floor"
+      },
+      {
+        "name": "xMin",
+        "value": 0,
+        "units": "m",
+        "min": 0,
+        "max": 0,
+        "group": "parameter",
+        "description": "left wall position"
+      },
+      {
+        "name": "xMax",
+        "value": 10,
+        "units": "m",
+        "min": 5,
+        "max": 20,
+        "group": "parameter",
+        "description": "right wall position"
+      },
+      {
+        "name": "yMin",
+        "value": 0,
+        "units": "m",
+        "min": 0,
+        "max": 0,
+        "group": "parameter",
+        "description": "floor height"
+      },
+      {
+        "name": "yMax",
+        "value": 10,
+        "units": "m",
+        "min": 5,
+        "max": 20,
+        "group": "parameter",
+        "description": "ceiling height"
+      },
+      {
+        "name": "x0",
+        "value": 5,
+        "units": "m",
+        "min": 1,
+        "max": 9,
+        "group": "initial condition",
+        "description": "initial horizontal position"
+      },
+      {
+        "name": "y0",
+        "value": 5,
+        "units": "m",
+        "min": 1,
+        "max": 9,
+        "group": "initial condition",
+        "description": "initial height"
+      },
+      {
+        "name": "vx0",
+        "value": -6.5,
+        "units": "m/s",
+        "min": -15,
+        "max": 15,
+        "group": "initial condition",
+        "description": "initial horizontal velocity"
+      },
+      {
+        "name": "vy0",
+        "value": 10,
+        "units": "m/s",
+        "min": -15,
+        "max": 15,
+        "group": "initial condition",
+        "description": "initial vertical velocity"
+      }
+    ],
+    "x0": [
+      5,
+      5,
+      -6.5,
+      10
+    ],
+    "events": [
+      {
+        "time": 0.54648670724798931,
+        "guard": "ceiling"
+      },
+      {
+        "time": 0.61538461538462264,
+        "guard": "leftWall"
+      },
+      {
+        "time": 1.5001364389065228,
+        "guard": "floor"
+      },
+      {
+        "time": 2.15384615384617,
+        "guard": "rightWall"
+      },
+      {
+        "time": 3.6312640538444452,
+        "guard": "floor"
+      },
+      {
+        "time": 4.07692307692315,
+        "guard": "leftWall"
+      },
+      {
+        "time": 5.3361661457948086,
+        "guard": "floor"
+      }
+    ]
+  }
+}

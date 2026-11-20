@@ -1,0 +1,13 @@
+# MATLAB
+*.asv
+*.mex*
+slprj/
+**/results/
+examples/zz_*.m
+livescripts/zz_*.m
+# Operating system and editors
+.DS_Store
+Thumbs.db
+*~
+# Node
+node_modules/
