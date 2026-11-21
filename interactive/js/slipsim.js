@@ -488,27 +488,76 @@
     });
   }
 
-  function stridesSurvived(p, apex, nMax) {
+  // Strides completed from an apex state, and the failure mode if the run
+  // ends early ('footBelowGround', 'fall', 'reversal', ...; '' if none).
+  function stridesSurvivedInfo(p, apex, nMax) {
     let s = { y: apex.y, vx: apex.vx };
     for (let i = 0; i < nMax; i++) {
       const r = returnMap(p, s);
-      if (!r.ok) return i;
+      if (!r.ok) return { strides: i, failure: r.reason };
       s = { y: r.y, vx: r.vx };
     }
-    return nMax;
+    return { strides: nMax, failure: '' };
   }
 
+  function stridesSurvived(p, apex, nMax) {
+    return stridesSurvivedInfo(p, apex, nMax).strides;
+  }
+
+  // Unexpected drop in ground height, as slip_stability.m. Each row gives
+  // the strides completed and the failure mode; dropFailure is the failure
+  // mode at the first height not survived.
   function dropTest(p, apex, heights, nStrides) {
     nStrides = nStrides || 20;
     const rows = heights.map(function (h) {
-      const n = stridesSurvived(p, { y: apex.y + h, vx: apex.vx }, nStrides);
-      return { height: h, survived: n === nStrides, strides: n };
+      const r = stridesSurvivedInfo(p, { y: apex.y + h, vx: apex.vx }, nStrides);
+      return { height: h, survived: r.strides === nStrides, strides: r.strides, failure: r.failure };
     });
-    let maxDrop = heights[heights.length - 1];
+    let maxDrop = heights[heights.length - 1], dropFailure = '';
     for (let i = 0; i < rows.length; i++) {
-      if (!rows[i].survived) { maxDrop = i === 0 ? 0 : heights[i - 1]; break; }
+      if (!rows[i].survived) {
+        maxDrop = i === 0 ? 0 : heights[i - 1];
+        dropFailure = rows[i].failure;
+        break;
+      }
     }
-    return { maxDrop: maxDrop, rows: rows };
+    return { maxDrop: maxDrop, dropFailure: dropFailure, rows: rows };
+  }
+
+  /* ===================== Swing-leg retraction for foot clearance ===================== */
+  /*
+   * retractionForClearance(p, apex, clearance), as slip_retractionForClearance.m.
+   * Sets the leg angle at apex so the foot is `clearance` above the ground and
+   * the retraction rate so the leg reaches the original touchdown angle at the
+   * original touchdown time. The periodic gait is unchanged.
+   * Returns {p, touchdownAngleDeg, fallTime, apexClearanceBefore}; throws if
+   * the clearance would need forward leg rotation.
+   */
+  function touchdownOf(p, apex) {
+    const r = simulateStride(p, apexState(p, apex.y, apex.vx));
+    const td = r.events.find(function (e) { return e.guard === 'touchdown'; });
+    if (!r.ok || !td) throw new Error('The gait does not complete a stride (' + r.reason + ').');
+    return { angle: legAngleDeg(td.x) * DEG, time: td.time };
+  }
+
+  function retractionForClearance(p, apex, clearance) {
+    const td = touchdownOf(p, apex);
+    if (clearance >= apex.y) throw new Error('The clearance must be below the apex height.');
+    const a = Math.asin((apex.y - clearance) / p.L0);
+    if (a > td.angle) {
+      throw new Error('This clearance needs forward leg rotation; use a clearance below ' +
+        (apex.y - p.L0 * Math.sin(td.angle)).toFixed(3) + ' m.');
+    }
+    const q = Object.assign({}, p, {
+      legAngleDeg: a / DEG,
+      retractionDegPerS: (td.angle - a) / DEG / td.time
+    });
+    return { p: q, touchdownAngleDeg: td.angle / DEG, fallTime: td.time,
+      apexClearanceBefore: apex.y - p.L0 * Math.sin(p.legAngleDeg * DEG) };
+  }
+
+  function apexClearance(p, apex) {
+    return apex.y - p.L0 * Math.sin(p.legAngleDeg * DEG);
   }
 
   /* ===================== Solvers ===================== */
@@ -634,7 +683,9 @@
   /*
    * stiffnessFamily(base, kValues, target, opts): continuation in leg
    * stiffness from a periodic base gait, as slip_stiffnessFamily.m.
-   * opts: {drop: false, heights, nStrides, onProgress(fraction)}
+   * opts: {drop: false, heights, nStrides, footClearance: NaN, onProgress(fraction)}
+   *   footClearance: minimum foot height at apex (m); gaits below it get the
+   *   retraction from retractionForClearance; NaN keeps a fixed leg angle.
    * Returns an array of rows (one per k), or a Promise when opts.async.
    */
   function familyRow(k, g, opts) {
@@ -651,15 +702,26 @@
     row.legAngleDeg = g.p.legAngleDeg;
     row.apexHeight = g.y;
     row.apexSpeed = g.vx;
+    row.retractionDegPerS = g.p.retractionDegPerS;
+    row.apexClearance = apexClearance(g.p, { y: g.y, vx: g.vx });
     row.lambda = lambda(g.p, { y: g.y, vx: g.vx });
     if (opts.drop) {
-      row.maxDrop = dropTest(g.p, { y: g.y, vx: g.vx }, opts.heights, opts.nStrides).maxDrop;
+      const d = dropTest(g.p, { y: g.y, vx: g.vx }, opts.heights, opts.nStrides);
+      row.maxDrop = d.maxDrop;
+      row.dropFailure = d.dropFailure;
     }
     return row;
   }
 
   async function stiffnessFamily(base, kValues, target, opts) {
-    opts = Object.assign({ drop: false, heights: range(0.01, 0.50, 0.01), nStrides: 20 }, opts || {});
+    opts = Object.assign({ drop: false, heights: range(0.01, 0.50, 0.01), nStrides: 20,
+      footClearance: NaN }, opts || {});
+    // Solve the gaits with a fixed leg angle; retraction leaves them unchanged.
+    if (base.p.retractionDegPerS !== 0) {
+      const td = touchdownOf(base.p, { y: base.y, vx: base.vx });
+      base = { p: Object.assign({}, base.p, { legAngleDeg: td.angle / DEG, retractionDegPerS: 0 }),
+        y: base.y, vx: base.vx };
+    }
     const n = kValues.length;
     const gaits = new Array(n).fill(null);
     let i0 = 0;
@@ -696,6 +758,14 @@
         }
         await tick();
       }
+    }
+    // Add swing-leg retraction where the foot clearance at apex is too small.
+    if (isFinite(opts.footClearance)) {
+      gaits.forEach(function (g, i) {
+        if (g && apexClearance(g.p, g) < opts.footClearance) {
+          gaits[i] = Object.assign({}, g, { p: retractionForClearance(g.p, g, opts.footClearance).p });
+        }
+      });
     }
     const rows = [];
     for (let i = 0; i < n; i++) {
@@ -782,6 +852,9 @@
     lambda: lambda,
     apexMapAtEnergy: apexMapAtEnergy,
     stridesSurvived: stridesSurvived,
+    stridesSurvivedInfo: stridesSurvivedInfo,
+    retractionForClearance: retractionForClearance,
+    apexClearance: apexClearance,
     dropTest: dropTest,
     newtonSolve: newtonSolve,
     findGait: findGait,

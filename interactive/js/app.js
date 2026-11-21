@@ -63,21 +63,21 @@
     };
   }
 
-  // Legacy 2020 settings for the numerical-methods tab.
-  var LEGACY = {
-    p: { m: 80, k: 50000, L0: 1, g: 9.81, legAngleDeg: 180 - 2.754657 / DEG,
-      retractionDegPerS: 3 * Math.sqrt(9.81 / 0.667) / DEG },
-    apex: { y: 0.998622, vx: 5 }
-  };
-
   var REASONS = {
     cycleLimit: 'completed the stride',
     fall: 'the body reached the ground',
-    reversal: 'forward speed reached zero during stance, so the runner falls backward',
-    footBelowGround: 'the apex was too low for the leg angle, so the foot would start below the ground',
+    reversal: 'forward speed reached zero',
+    footBelowGround: 'the apex fell below the height needed to place the leg (foot below the ground at apex)',
     timeLimit: 'no touchdown within 5 s',
     stepTooSmall: 'the integrator step became too small'
   };
+  // Failure modes arrive as "fall" from the browser simulator and as
+  // "terminal:fall" from MATLAB; both map to the same text.
+  function reasonText(r) {
+    if (!r) return 'none';
+    var key = String(r).replace('terminal:', '');
+    return REASONS[key] || key;
+  }
 
   /* ===================== Application state ===================== */
   var init = presetState('human');
@@ -94,10 +94,10 @@
     periodic: false,
     lambda: NaN,
     cobwebStart: 0.01,
+    clearance: REF.slip.family.footClearance,
     family: { rows: MATLAB_FAMILY, source: 'matlab' },
     perturb: { drop: 0.05, strides: 15, run: null, compare: null },
     grid: { result: null, stale: false, busy: false },
-    numerics: { scanDt: 0.0002, result: null },
     ball: ballDefaults(),
     ballRun: null,
     anim: { source: null, t: 0, playing: false, speed: 0.25, lastTs: null, kind: 'slip' },
@@ -109,8 +109,8 @@
     var v = {};
     BALL_SPEC.forEach(function (r) { v[r.name] = r.value; });
     return {
-      p: { g: v.g, radius: v.radius, restitution: v.restitution, xMin: v.xMin, xMax: v.xMax,
-        yMin: v.yMin, yMax: v.yMax },
+      p: { g: v.g, radius: v.radius, restitution: v.restitution, restSpeed: v.restSpeed,
+        xMin: v.xMin, xMax: v.xMax, yMin: v.yMin, yMax: v.yMax },
       x0: [v.x0, v.y0, v.vx0, v.vy0]
     };
   }
@@ -127,6 +127,7 @@
     legAngleDeg: 'Leg angle at apex', retractionDegPerS: 'Leg retraction rate',
     apexHeight: 'Apex height', apexSpeed: 'Forward speed at apex' };
   var BALL_LABELS = { g: 'Gravity', radius: 'Ball radius', restitution: 'Coefficient of restitution',
+    restSpeed: 'Rest speed on the floor',
     xMax: 'Box width', yMax: 'Box height', x0: 'Initial x position', y0: 'Initial height',
     vx0: 'Initial horizontal velocity', vy0: 'Initial vertical velocity' };
   var controlInputs = {};   // name -> {range, number}
@@ -187,7 +188,8 @@
   }
   function cleanNumber(v, step) {
     var d = Math.max(0, Math.min(6, Math.ceil(-Math.log10(step)) + 2));
-    return Number(v).toFixed(d).replace(/\.?0+$/, '');
+    var t = Number(v).toFixed(d);
+    return t.indexOf('.') >= 0 ? t.replace(/0+$/, '').replace(/\.$/, '') : t;
   }
   function syncControls() {
     Object.keys(controlInputs).forEach(function (name) {
@@ -216,7 +218,9 @@
     sel.addEventListener('change', function () { loadPreset(sel.value); });
     pw.appendChild(sel);
     pw.appendChild(el('p', { 'class': 'desc' }, 'Each preset is a periodic gait at ' +
-      fmt(FAMILY_TARGET.meanSpeed, 1) + ' m/s and ' + fmt(FAMILY_TARGET.stepFrequency, 1) + ' steps per second, solved in MATLAB.'));
+      fmt(FAMILY_TARGET.meanSpeed, 1) + ' m/s and ' + fmt(FAMILY_TARGET.stepFrequency, 1) +
+      ' steps per second, solved in MATLAB. Swing-leg retraction from apex places the foot ' +
+      fmt(PRESETS[0].apexClearance * 100, 1) + ' cm above the ground at apex; the leg lands at the same angle and time as with a fixed leg angle, so the gait is the same.'));
     side.appendChild(pw);
 
     SLIP_GROUPS.forEach(function (g) {
@@ -226,6 +230,7 @@
         fs.appendChild(makeControl(r, SLIP_LABELS[r.name] || r.name, SLIP_STEPS[r.name] || 0.01,
           getSlipValue, setSlipValue, onSlipChange));
       });
+      if (g[0] === 'contact condition') fs.appendChild(clearanceBlock());
       side.appendChild(fs);
     });
 
@@ -277,6 +282,59 @@
     side.appendChild(fsR);
   }
 
+  // Foot clearance at apex: set the retraction that lifts the foot to a
+  // chosen height at apex, or return to a fixed leg angle.
+  function clearanceBlock() {
+    var wrap = el('div', { 'class': 'control' });
+    var row = el('div', { 'class': 'target-row' });
+    row.appendChild(el('label', { 'for': 'clearanceInput' }, 'Minimum foot clearance at apex (m)'));
+    var inp = el('input', { type: 'number', id: 'clearanceInput', min: 0, max: 0.3, step: 0.005, value: S.clearance });
+    inp.addEventListener('change', function () {
+      var v = parseFloat(inp.value);
+      if (isFinite(v) && v >= 0) S.clearance = v; else inp.value = S.clearance;
+    });
+    row.appendChild(inp);
+    wrap.appendChild(row);
+    var br = el('div', { 'class': 'button-row' });
+    var b1 = el('button', { type: 'button', 'class': 'btn btn-quiet' }, 'Set retraction for this clearance');
+    b1.addEventListener('click', setRetractionForClearance);
+    var b2 = el('button', { type: 'button', 'class': 'btn btn-quiet' }, 'Fixed leg angle');
+    b2.addEventListener('click', setFixedLegAngle);
+    br.appendChild(b1);
+    br.appendChild(b2);
+    wrap.appendChild(br);
+    wrap.appendChild(el('p', { 'class': 'desc' }, 'Retraction lifts the foot at apex while the leg still lands at the same angle and the same time.'));
+    return wrap;
+  }
+
+  function setRetractionForClearance() {
+    try {
+      var r = SlipSim.retractionForClearance(S.p, S.apex, S.clearance);
+      S.p.legAngleDeg = r.p.legAngleDeg;
+      S.p.retractionDegPerS = r.p.retractionDegPerS;
+      syncControls();
+      recomputeSlip();
+      updateStatus('Retraction set: leg angle at apex ' + fmt(r.p.legAngleDeg, 2) + ' deg, retraction rate ' +
+        fmt(r.p.retractionDegPerS, 1) + ' deg/s, touchdown angle ' + fmt(r.touchdownAngleDeg, 2) +
+        ' deg. Foot clearance at apex ' + fmt(S.clearance * 100, 1) + ' cm (was ' + fmt(r.apexClearanceBefore * 100, 1) + ' cm).');
+    } catch (e) {
+      updateStatus('Retraction not set: ' + e.message, true);
+    }
+  }
+
+  function setFixedLegAngle() {
+    if (!S.M || !S.M.ok) {
+      updateStatus('The current stride does not complete, so it has no touchdown angle to keep. Load a preset first.', true);
+      return;
+    }
+    S.p.legAngleDeg = S.M.touchdownAngleDeg;
+    S.p.retractionDegPerS = 0;
+    syncControls();
+    recomputeSlip();
+    updateStatus('Fixed leg angle: the leg stays at ' + fmt(S.p.legAngleDeg, 2) + ' deg from apex to touchdown. Foot clearance at apex ' +
+      fmt(SlipSim.apexClearance(S.p, S.apex) * 100, 2) + ' cm.');
+  }
+
   function buildBallSidebar() {
     var side = $('sidebar');
     side.innerHTML = '';
@@ -288,7 +346,8 @@
       BALL_SPEC.filter(function (r) {
         return r.group === g[0] && r.max > r.min && BALL_LABELS[r.name];
       }).forEach(function (r) {
-        fs.appendChild(makeControl(r, BALL_LABELS[r.name], 0.01, getBallValue, setBallValue, onBallChange));
+        fs.appendChild(makeControl(r, BALL_LABELS[r.name], r.name === 'restSpeed' ? 0.001 : 0.01,
+          getBallValue, setBallValue, onBallChange));
       });
       side.appendChild(fs);
     });
@@ -326,7 +385,7 @@
     S.periodic = !!first && Math.abs(first.y - S.apex.y) < 1e-6 && Math.abs(first.vx - S.apex.vx) < 1e-6;
     S.lambda = M.ok ? SlipSim.lambda(S.p, S.apex) : NaN;
     updateReadouts();
-    if (S.tab !== 'perturb' && S.tab !== 'numerics') setAnimSource(slipSource(run), false);
+    if (S.tab !== 'perturb') setAnimSource(slipSource(run), false);
     renderActiveTab();
     updateStatus();
   }
@@ -339,6 +398,7 @@
     var first = S.run && S.run.apexSeq[1];
     var rows = [
       ['Touchdown angle', M && M.ok ? fmt(M.touchdownAngleDeg, 2) + ' deg' : 'n/a'],
+      ['Foot clearance at apex', fmt(SlipSim.apexClearance(p, S.apex) * 100, 2) + ' cm'],
       ['Average speed', M && M.ok ? fmt(M.meanSpeed, 3) + ' m/s' : 'n/a'],
       ['Step frequency', M && M.ok ? fmt(M.stepFrequency, 3) + ' 1/s' : 'n/a'],
       ['Froude number v^2/(g L0)', M && M.ok ? fmt(M.froude, 3) : 'n/a'],
@@ -366,7 +426,7 @@
         msg = done + ' strides completed. Contact time ' + fmt(M.contactTime, 3) + ' s, peak vertical force ' +
           fmt(M.peakVerticalForceBW, 2) + ' body weights, lambda ' + fmt(S.lambda, 2) + '.';
       } else {
-        msg = 'The run stopped after ' + done + ' completed strides: ' + (REASONS[run.reason] || run.reason) + '.';
+        msg = 'The run stopped after ' + done + ' completed strides: ' + reasonText(run.reason) + '.';
       }
     }
     $('status').textContent = extra ? extra + ' ' + msg : msg;
@@ -675,7 +735,7 @@
   }
 
   /* ===================== Tabs ===================== */
-  var TABS = ['stride', 'returnMap', 'family', 'perturb', 'map', 'numerics'];
+  var TABS = ['stride', 'returnMap', 'family', 'perturb', 'map'];
 
   function selectTab(name, focus) {
     S.tab = name;
@@ -688,7 +748,6 @@
       if (on && focus) tab.focus();
     });
     if (name === 'perturb') runPerturbation();
-    else if (name === 'numerics') runNumerics();
     else if (S.run) setAnimSource(slipSource(S.run), false);
     renderActiveTab();
   }
@@ -715,7 +774,6 @@
     else if (S.tab === 'family') renderFamily();
     else if (S.tab === 'perturb') renderPerturbation();
     else if (S.tab === 'map') renderGrid();
-    else if (S.tab === 'numerics') renderNumerics();
   }
 
   /* ----- Stride tab ----- */
@@ -724,7 +782,7 @@
     var table = $('measuresTable');
     if (!M || !M.ok) {
       msg.hidden = false;
-      msg.textContent = 'The first stride did not complete: ' + (REASONS[M && M.reason] || 'unknown reason') +
+      msg.textContent = 'The first stride did not complete: ' + reasonText(M && M.reason) +
         '. Change the settings, load a preset, or press Find periodic gait.';
       Plot.render($('strideCanvas'), { panels: [], panelHeight: 10 });
       table.innerHTML = '';
@@ -843,27 +901,91 @@
 
   /* ----- Same speed, different legs ----- */
   function okRow(r) { return r && r.legAngleDeg !== null && r.legAngleDeg !== undefined && isFinite(r.legAngleDeg) && r.ok !== false; }
+  function num(v) { return v === null || v === undefined ? NaN : Number(v); }
 
+  // Summary of a stiffness family, computed from its rows.
   function familyStats(rows) {
     var ok = rows.filter(okRow);
     if (!ok.length) return null;
     var k = function (r) { return r.k / 1000; };
-    var stable = ok.filter(function (r) { return isFinite(r.lambda) && Math.abs(r.lambda) < 1; });
-    var best = ok.reduce(function (b, r) { return Math.abs(r.lambda) < Math.abs(b.lambda) ? r : b; }, ok[0]);
-    var drops = ok.filter(function (r) { return r.maxDrop !== null && r.maxDrop !== undefined && isFinite(r.maxDrop); });
-    var dropBest = drops.length ? drops.reduce(function (b, r) { return r.maxDrop > b.maxDrop ? r : b; }, drops[0]) : null;
+    var lam = ok.map(function (r) { return num(r.lambda); });
+    var stableSeg = [], seg = null;
+    ok.forEach(function (r, i) {
+      if (Math.abs(lam[i]) < 1) { if (!seg) { seg = [k(r), k(r)]; stableSeg.push(seg); } else seg[1] = k(r); }
+      else seg = null;
+    });
+    var iBest = 0, iMin = 0, iMax = 0;
+    lam.forEach(function (v, i) {
+      if (Math.abs(v) < Math.abs(lam[iBest])) iBest = i;
+      if (v < lam[iMin]) iMin = i;
+      if (v > lam[iMax]) iMax = i;
+    });
+    var crossings = [];
+    for (var i = 1; i < ok.length; i++) {
+      if (lam[i - 1] < 0 && lam[i] >= 0 || lam[i - 1] >= 0 && lam[i] < 0) {
+        var f = lam[i - 1] / (lam[i - 1] - lam[i]);
+        crossings.push({ k: k(ok[i - 1]) + f * (k(ok[i]) - k(ok[i - 1])), up: lam[i] > lam[i - 1] });
+      }
+    }
+    var retr = ok.filter(function (r) { return num(r.retractionDegPerS) > 1e-9; });
+    var drops = ok.filter(function (r) { return isFinite(num(r.maxDrop)); });
+    var dMin = drops.length ? drops.reduce(function (b, r) { return r.maxDrop < b.maxDrop ? r : b; }, drops[0]) : null;
+    var dMax = drops.length ? drops.reduce(function (b, r) { return r.maxDrop > b.maxDrop ? r : b; }, drops[0]) : null;
+    var modes = {};
+    drops.forEach(function (r) { if (r.dropFailure) modes[String(r.dropFailure).replace('terminal:', '')] = true; });
+    var clear = ok.map(function (r) { return num(r.apexClearance); }).filter(isFinite);
     return {
-      ok: ok, kMin: k(ok[0]), kMax: k(ok[ok.length - 1]),
-      kStableMin: stable.length ? k(stable[0]) : NaN, kStableMax: stable.length ? k(stable[stable.length - 1]) : NaN,
-      kBest: k(best), lambdaBest: best.lambda,
-      dropMax: dropBest ? dropBest.maxDrop : NaN, kDropMax: dropBest ? k(dropBest) : NaN,
+      ok: ok, kMin: k(ok[0]), kMax: k(ok[ok.length - 1]), n: ok.length,
+      stableSeg: stableSeg, allStable: stableSeg.length === 1 && stableSeg[0][0] === k(ok[0]) && stableSeg[0][1] === k(ok[ok.length - 1]),
+      kStableMin: stableSeg.length ? stableSeg[0][0] : NaN, kStableMax: stableSeg.length ? stableSeg[stableSeg.length - 1][1] : NaN,
+      kBest: k(ok[iBest]), lambdaBest: lam[iBest],
+      kLambdaMin: k(ok[iMin]), lambdaMin: lam[iMin], kLambdaMax: k(ok[iMax]), lambdaMax: lam[iMax],
+      crossings: crossings,
+      nRetract: retr.length,
+      retrFirst: retr.length ? retr[0] : null, retrLast: retr.length ? retr[retr.length - 1] : null,
+      clearanceMin: clear.length ? Math.min.apply(null, clear) : NaN,
+      hasDrop: drops.length > 0,
+      dropMin: dMin, dropMax: dMax, dropMaxValue: dMax ? dMax.maxDrop : NaN, kDropMax: dMax ? k(dMax) : NaN,
+      dropModes: Object.keys(modes),
       speed: ok[0].meanSpeed, frequency: ok[0].stepFrequency
     };
   }
 
   function trendWord(rows, field) {
-    var a = rows[0][field], b = rows[rows.length - 1][field];
+    var a = num(rows[0][field]), b = num(rows[rows.length - 1][field]);
     return b > a ? 'rises' : 'falls';
+  }
+
+  // Stability description written from the rows.
+  function stabilityText(st) {
+    var t = '';
+    if (st.allStable) t += 'Every gait in this family has |lambda| < 1, so small errors in apex height decay. ';
+    else if (st.stableSeg.length) {
+      t += '|lambda| < 1, so small errors decay, for ' + st.stableSeg.map(function (sg) {
+        return sg[0] === sg[1] ? fmt(sg[0], 0) + ' kN/m' : fmt(sg[0], 0) + ' to ' + fmt(sg[1], 0) + ' kN/m';
+      }).join(' and ') + '; errors grow at the other stiffnesses. ';
+    } else t += 'No gait in this family has |lambda| < 1. ';
+    if (!st.crossings.length) {
+      t += st.lambdaMax < 0 ? 'lambda is negative for every gait, so errors change sign from stride to stride. ' :
+        'lambda is positive for every gait, so errors keep their sign. ';
+    } else {
+      t += st.crossings.map(function (c) {
+        return 'lambda changes from ' + (c.up ? 'negative to positive' : 'positive to negative') + ' near ' + fmt(c.k, 1) + ' kN/m';
+      }).join('; ') + ': errors change sign from stride to stride where lambda < 0 and keep their sign where lambda > 0. ';
+    }
+    t += 'lambda is most negative (' + fmt(st.lambdaMin, 3) + ') at ' + fmt(st.kLambdaMin, 0) + ' kN/m and largest (' +
+      fmt(st.lambdaMax, 3) + ') at ' + fmt(st.kLambdaMax, 0) + ' kN/m; |lambda| is smallest (' + fmt(Math.abs(st.lambdaBest), 3) +
+      ') at ' + fmt(st.kBest, 0) + ' kN/m, where errors decay fastest.';
+    return t;
+  }
+
+  function retractionText(st, clearance) {
+    if (!st.nRetract) return 'Every gait in this family uses a fixed leg angle (no swing-leg retraction).';
+    var a = st.retrFirst, b = st.retrLast;
+    return (st.nRetract === st.n ? 'Every gait' : st.nRetract + ' of ' + st.n + ' gaits') +
+      ' in this family uses swing-leg retraction to keep the foot at least ' + fmt(clearance * 100, 1) +
+      ' cm above the ground at apex, at rates from ' + fmt(a.retractionDegPerS, 0) + ' deg/s at ' + fmt(a.k / 1000, 0) + ' kN/m to ' +
+      fmt(b.retractionDegPerS, 0) + ' deg/s at ' + fmt(b.k / 1000, 0) + ' kN/m. Retraction leaves each periodic gait unchanged and changes only its stability and its response to perturbations.';
   }
 
   function renderFamily() {
@@ -871,8 +993,7 @@
     var st = familyStats(S.family.rows);
     if (!st) { $('familyIntro').textContent = 'No gaits in this family.'; return; }
     var kk = rows.map(function (r) { return r.k / 1000; });
-    var col = function (f) { return rows.map(function (r) { return r[f] === null ? NaN : r[f]; }); };
-    var marks = [];
+    var col = function (f) { return rows.map(function (r) { return num(r[f]); }); };
     var presetSeries = function () { return []; };
     if (S.family.source === 'matlab') {
       presetSeries = function (field) {
@@ -881,7 +1002,7 @@
           // Marker colors magenta, teal, orange stay distinct from the family line in both themes.
           var C = Plot.colors();
           var colr = [C.series[1], C.series[2], C.series[4]][j % 3];
-          return { x: [pr.k / 1000], y: [r ? r[field] : NaN], points: true, style: j + 1, color: colr,
+          return { x: [pr.k / 1000], y: [r ? num(r[field]) : NaN], points: true, style: j + 1, color: colr,
             radius: [6.5, 5.5, 4.5][j % 3], label: pr.label };
         });
       };
@@ -891,30 +1012,33 @@
       return {
         xLabel: 'Leg stiffness (kN/m)', yLabel: ylab, refs: refs || [], legend: legend || null,
         series: [{ x: kk, y: col(field), style: 0, width: 2 }].concat(presetSeries(field)),
-        marks: S.family.source !== 'matlab' && cur ? [{ x: cur.k / 1000, y: cur[field] }] : marks
+        marks: S.family.source !== 'matlab' && cur ? [{ x: cur.k / 1000, y: num(cur[field]) }] : []
       };
     };
     var canvas = $('familyCanvas');
     var w = canvas.clientWidth || 600;
-    var cols = w >= 760 ? 3 : (w >= 480 ? 2 : 1);
+    var cols = w >= 980 ? 4 : (w >= 700 ? 3 : (w >= 460 ? 2 : 1));
     var panels = [
       panel('peakVerticalForceBW', 'Peak vertical force (BW)', [], 'tl'),
       panel('contactTime', 'Contact time (s)'),
       panel('positiveWorkPerDistance', 'Positive leg work (J/(kg m))'),
       panel('forceTimeCostIndex', 'Force-time cost index (1/s)'),
+      panel('retractionDegPerS', 'Retraction rate (deg/s)'),
       panel('lambda', 'Eigenvalue lambda', [{ y: -1 }, { y: 0 }, { y: 1 }])
     ];
-    var hasDrop = rows.some(function (r) { return r.maxDrop !== null && r.maxDrop !== undefined && isFinite(r.maxDrop); });
-    if (hasDrop) panels.push(panel('maxDrop', 'Largest drop survived (m)'));
+    if (st.hasDrop) panels.push(panel('maxDrop', 'Largest drop survived (m)'));
     Plot.render(canvas, {
       cols: cols, panelHeight: 210, panels: panels,
-      alt: 'Six panels against leg stiffness from ' + fmt(st.kMin, 0) + ' to ' + fmt(st.kMax, 0) +
-        ' kN/m at one average speed: peak vertical force, contact time, positive leg work per distance, force-time cost index, eigenvalue lambda and largest drop survived.'
+      alt: 'Panels against leg stiffness from ' + fmt(st.kMin, 0) + ' to ' + fmt(st.kMax, 0) +
+        ' kN/m at one average speed: peak vertical force, contact time, positive leg work per distance, force-time cost index, retraction rate, eigenvalue lambda' +
+        (st.hasDrop ? ' and largest drop survived.' : '.')
     });
 
+    var clearance = S.family.source === 'matlab' ? REF.slip.family.footClearance : S.family.footClearance;
     var src = S.family.source === 'matlab' ? 'computed in MATLAB (tools/exportWebReference.m)' : 'computed in this browser for the current body';
     $('familyIntro').textContent = 'Every gait in this family is periodic at an average speed of ' + fmt(st.speed, 2) +
-      ' m/s and ' + fmt(st.frequency, 2) + ' steps per second. Each leg stiffness reaches that speed with its own leg angle and apex height, so one speed admits many solutions. Family ' + src + '.';
+      ' m/s and ' + fmt(st.frequency, 2) + ' steps per second. Each leg stiffness reaches that speed with its own touchdown angle and apex height, so one speed admits many solutions. ' +
+      retractionText(st, clearance) + ' Family ' + src + '.';
 
     var first = rows[0], last = rows[rows.length - 1];
     var parts = [];
@@ -926,25 +1050,31 @@
       trendWord(rows, 'positiveWorkPerDistance') + ' from ' + fmt(first.positiveWorkPerDistance, 3) + ' to ' + fmt(last.positiveWorkPerDistance, 3) +
       ' J/(kg m). The force-time cost index, the inverse of contact time from the force-time hypothesis of Kram and Taylor (1990), ' +
       trendWord(rows, 'forceTimeCostIndex') + ' from ' + fmt(first.forceTimeCostIndex, 2) + ' to ' + fmt(last.forceTimeCostIndex, 2) + ' 1/s. The two proxies rank the gaits in opposite order.');
-    var stab = isFinite(st.kStableMin) ? 'In this family |lambda| < 1, so small errors decay, from ' + fmt(st.kStableMin, 0) + ' to ' + fmt(st.kStableMax, 0) +
-      ' kN/m; |lambda| is smallest (' + fmt(st.lambdaBest, 2) + ') near ' + fmt(st.kBest, 0) + ' kN/m, where errors decay fastest.' :
-      'No gait in this family has |lambda| < 1.';
-    if (hasDrop && isFinite(st.dropMax)) stab += ' The largest unexpected drop survived for 20 strides reaches ' + fmt(st.dropMax * 100, 0) + ' cm at ' + fmt(st.kDropMax, 0) + ' kN/m.';
-    parts.push(stab + ' Daley and Usherwood (2010) proposed the normalized maximum drop, a kinematic measure, which predicts that compliant legs negotiate relatively larger drops. The drop test here holds the leg angle fixed and counts strides to failure, so the two measures address different questions.');
+    parts.push(stabilityText(st));
+    if (st.hasDrop) {
+      parts.push('The largest unexpected drop survived for 20 strides ranges from ' + fmt(st.dropMin.maxDrop * 100, 0) + ' cm at ' +
+        fmt(st.dropMin.k / 1000, 0) + ' kN/m to ' + fmt(st.dropMaxValue * 100, 0) + ' cm at ' + fmt(st.kDropMax, 0) +
+        ' kN/m (drops tested up to 50 cm). ' + (st.dropModes.length ? 'Failure mode at the first drop not survived: ' +
+          st.dropModes.map(reasonText).join('; ') + '.' : 'No gait failed within the tested drops.'));
+    }
+    parts.push('Daley and Usherwood (2010) proposed the normalized maximum drop, a kinematic measure, which predicts that compliant legs negotiate relatively larger drops. The drop test here holds the leg control fixed and counts strides to failure, so the two measures address different questions.');
     var ft = $('familyText');
     ft.innerHTML = '';
-    parts.forEach(function (s) { ft.appendChild(el('p', null, s)); });
+    parts.forEach(function (x) { ft.appendChild(el('p', null, x)); });
 
-    // Comparison table of the presets (from the MATLAB family): one row per
-    // measure, one column per gait, ordered by leg stiffness.
+    // Comparison table of the presets (MATLAB family): one row per measure,
+    // one column per gait, ordered by leg stiffness.
     var tbl = $('familyTable');
     var gaits = PRESETS.slice().sort(function (a, b) { return a.k - b.k; }).map(function (pr) {
       return { pr: pr, r: MATLAB_FAMILY.filter(function (q) { return Math.abs(q.k - pr.k) < 1; })[0] || {} };
     });
     var measures = [
       ['Leg stiffness (kN/m)', function (g) { return fmt(g.pr.k / 1000, 0); }],
-      ['Leg angle at apex (deg)', function (g) { return fmt(g.pr.legAngleDeg, 2); }],
       ['Apex height (m)', function (g) { return fmt(g.pr.apexHeight, 4); }],
+      ['Leg angle at apex (deg)', function (g) { return fmt(g.pr.legAngleDeg, 2); }],
+      ['Retraction rate (deg/s)', function (g) { return fmt(g.pr.retractionDegPerS, 1); }],
+      ['Touchdown angle (deg)', function (g) { return fmt(g.pr.touchdownAngleDeg, 2); }],
+      ['Foot clearance at apex (cm)', function (g) { return fmt(g.pr.apexClearance * 100, 1); }],
       ['Contact time (s)', function (g) { return fmt(g.r.contactTime, 3); }],
       ['Duty factor', function (g) { return fmt(g.r.dutyFactor, 3); }],
       ['Peak vertical force (BW)', function (g) { return fmt(g.r.peakVerticalForceBW, 2); }],
@@ -952,12 +1082,14 @@
       ['Positive leg work (J/(kg m))', function (g) { return fmt(g.r.positiveWorkPerDistance, 3); }],
       ['Force-time cost index (1/s)', function (g) { return fmt(g.r.forceTimeCostIndex, 2); }],
       ['Eigenvalue lambda', function (g) { return fmt(g.pr.lambda, 3); }],
-      ['Largest drop survived (cm)', function (g) { return fmt(g.pr.maxDrop * 100, 0); }]
+      ['Largest drop survived (cm)', function (g) { return fmt(g.pr.maxDrop * 100, 0); }],
+      ['Failure at the first drop not survived', function (g) { return reasonText(g.pr.dropFailure); }, 'wrap']
     ];
     var html = '<caption>Values from the MATLAB family. Load sets the sidebar to that gait.</caption><thead><tr><th scope="col">Measure</th>' +
       gaits.map(function (g) { return '<th scope="col">' + g.pr.label + '</th>'; }).join('') + '</tr></thead><tbody>';
     measures.forEach(function (m) {
-      html += '<tr><th scope="row">' + m[0] + '</th>' + gaits.map(function (g) { return '<td>' + m[1](g) + '</td>'; }).join('') + '</tr>';
+      html += '<tr' + (m[2] ? ' class="' + m[2] + '"' : '') + '><th scope="row">' + m[0] + '</th>' +
+        gaits.map(function (g) { return '<td>' + m[1](g) + '</td>'; }).join('') + '</tr>';
     });
     html += '<tr><td></td>' + gaits.map(function (g) {
       return '<td><button type="button" class="btn btn-quiet load-preset" data-preset="' + g.pr.name +
@@ -976,6 +1108,8 @@
   async function recomputeFamily() {
     var btn = $('familyRecompute'), prog = $('familyProgress');
     var target = { meanSpeed: S.target.meanSpeed, hold: 'stepFrequency', stepFrequency: S.target.stepFrequency };
+    var cIn = parseFloat($('familyClearance').value);
+    var clearance = isFinite(cIn) && cIn > 0 ? cIn : NaN;
     btn.disabled = true;
     updateStatus('Finding the periodic gait at the target speed and step frequency...', true);
     await pause();
@@ -992,15 +1126,25 @@
     var kValues = MATLAB_FAMILY.map(function (r) { return Math.round(r.k * scale); });
     prog.hidden = false;
     prog.value = 0;
-    var rows = await SlipSim.stiffnessFamily({ p: g.p, y: g.y, vx: g.vx }, kValues, target, {
-      drop: $('familyDrop').checked,
-      onProgress: function (f) { prog.value = f; }
-    });
+    var rows;
+    try {
+      rows = await SlipSim.stiffnessFamily({ p: g.p, y: g.y, vx: g.vx }, kValues, target, {
+        drop: $('familyDrop').checked,
+        footClearance: clearance,
+        onProgress: function (f) { prog.value = f; }
+      });
+    } catch (e) {
+      prog.hidden = true;
+      btn.disabled = false;
+      updateStatus('The family could not be computed: ' + e.message, true);
+      return;
+    }
     prog.hidden = true;
     btn.disabled = false;
-    S.family = { rows: rows, source: 'browser' };
+    S.family = { rows: rows, source: 'browser', footClearance: clearance };
     recomputeSlip();
-    updateStatus('Family recomputed: ' + rows.filter(okRow).length + ' of ' + rows.length + ' gaits solved.', true);
+    updateStatus('Family recomputed: ' + rows.filter(okRow).length + ' of ' + rows.length + ' gaits solved' +
+      (isFinite(clearance) ? ', with retraction where needed for ' + fmt(clearance * 100, 1) + ' cm of foot clearance.' : ', with a fixed leg angle.'), true);
   }
 
   /* ----- Perturbation tab ----- */
@@ -1011,6 +1155,28 @@
     S.perturb.run = run;
     S.perturb.compare = null;
     setAnimSource(slipSource(run), undefined);
+  }
+
+  // Outcome of a run with one drop after stride 1. Stride 1 runs on the
+  // original ground; strides after it are numbered from the drop.
+  function dropOutcome(run) {
+    var completed = run.apexSeq.length - 1;
+    if (run.reason === 'cycleLimit') return { ok: true, after: completed - 1 };
+    var failStride = completed;            // index of the stride that did not complete
+    var key = String(run.reason).replace('terminal:', '');
+    return { ok: false, beforeDrop: failStride === 0, strideAfter: failStride, completedAfter: Math.max(completed - 1, 0),
+      key: key, text: reasonText(key) };
+  }
+
+  function outcomeSentence(o, h, brief) {
+    if (o.ok) return 'completed all ' + o.after + ' strides after the drop';
+    if (o.beforeDrop) return 'stopped before the drop: ' + o.text;
+    var s = 'stopped at stride ' + o.strideAfter + ' after the drop' +
+      (o.strideAfter === 1 ? ' (the first stride after the drop)' : '') + ': ' + o.text;
+    if (!brief && o.key === 'footBelowGround' && o.strideAfter === 2) {
+      s += '. The first stride after the drop completed, and its apex undershot, so the leg could not be placed for the next stride';
+    }
+    return s;
   }
 
   function perturbSeries(run, h) {
@@ -1036,11 +1202,13 @@
         { yLabel: 'Apex height change (m)', series: series1, legend: 'tr', refs: [{ y: 0 }] },
         { yLabel: 'Apex speed (m/s)', xLabel: 'Stride (drop after stride 1)', series: series2 }
       ];
-      text = 'Drop of ' + fmt(h * 100, 1) + ' cm applied to each preset. ' + S.perturb.compare.map(function (c) {
-        var after = Math.max(c.run.apexSeq.length - 2, 0);
-        return c.label + ': ' + (c.run.reason === 'cycleLimit' ? 'completed all ' + after + ' strides after the drop' :
-          'stopped after ' + after + ' completed strides after the drop (' + (REASONS[c.run.reason] || c.run.reason) + ')');
-      }).join('; ') + '.';
+      var outs = S.perturb.compare.map(function (c) { return dropOutcome(c.run); });
+      text = 'Drop of ' + fmt(h * 100, 1) + ' cm applied to each preset. ' + S.perturb.compare.map(function (c, j) {
+        return c.label + ': ' + outcomeSentence(outs[j], h, true);
+      }).join('. ') + '.';
+      if (outs.some(function (o) { return !o.ok && o.key === 'footBelowGround' && o.strideAfter === 2; })) {
+        text += ' A stop at stride 2 means the first stride after the drop completed and its apex undershot, so the leg could not be placed for the next stride.';
+      }
     } else {
       var run = S.perturb.run;
       if (!run) return;
@@ -1050,11 +1218,10 @@
         { yLabel: 'Apex speed (m/s)', xLabel: 'Stride (drop after stride 1)', series: [{ x: s.n, y: s.vx, style: 1, points: true, line: true }] }
       ];
       var n = run.apexSeq.length - 1;
-      var after = Math.max(n - 1, 0);
-      text = run.reason === 'cycleLimit' ?
-        'After a drop of ' + fmt(h * 100, 1) + ' cm the runner completed all ' + after + ' strides that follow it. Apex speed went from ' +
-        fmt(run.apexSeq[0].vx, 3) + ' to ' + fmt(run.apexSeq[n].vx, 3) + ' m/s: the drop added mechanical energy, and the model has no damping to remove it.' :
-        'After a drop of ' + fmt(h * 100, 1) + ' cm the runner stopped after ' + after + ' completed strides: ' + (REASONS[run.reason] || run.reason) + '.';
+      var o = dropOutcome(run);
+      text = 'After a drop of ' + fmt(h * 100, 1) + ' cm the runner ' + outcomeSentence(o, h) + '.';
+      if (o.ok) text += ' Apex speed went from ' + fmt(run.apexSeq[0].vx, 3) + ' to ' + fmt(run.apexSeq[n].vx, 3) +
+        ' m/s: the drop added mechanical energy, and the model has no damping to remove it.';
     }
     $('perturbText').textContent = text;
     Plot.render($('perturbCanvas'), { panelHeight: 190, panels: panels,
@@ -1111,12 +1278,14 @@
     var R = S.grid.result;
     var txt = $('gridText');
     if (!R) {
-      txt.textContent = 'Press Compute map. A 20 x 20 map takes a few seconds.';
+      txt.textContent = 'Press Compute map. A 20 x 20 map takes a few seconds. The map uses the current retraction rate (' +
+        fmt(S.p.retractionDegPerS, 1) + ' deg/s).';
       Plot.render($('gridCanvas'), { panels: [], panelHeight: 10 });
       return;
     }
-    txt.textContent = 'Darker cells complete more strides; the darkest cells complete all 20. The open circle marks the current leg angle and stiffness. ' +
-      'Start: apex height ' + fmt(R.apex.y, 3) + ' m, apex speed ' + fmt(R.apex.vx, 3) + ' m/s.' +
+    txt.textContent = 'Darker cells complete more strides; the darkest cells complete all 20. The open circle marks the current leg angle at apex and stiffness. ' +
+      'Start: apex height ' + fmt(R.apex.y, 3) + ' m, apex speed ' + fmt(R.apex.vx, 3) + ' m/s. Every cell uses the retraction rate of ' +
+      fmt(R.p.retractionDegPerS, 1) + ' deg/s from the sidebar, so the leg rotates from the angle on the x axis until touchdown.' +
       (S.grid.stale ? ' The settings have changed since this map was computed.' : '');
     var canvas = $('gridCanvas');
     var w = canvas.clientWidth || 500;
@@ -1132,58 +1301,6 @@
         })
       }]
     });
-  }
-
-  /* ----- Numerical methods tab ----- */
-  function legacyDip() {
-    var p = LEGACY.p, a = LEGACY.apex;
-    var a0 = p.legAngleDeg * DEG, om = p.retractionDegPerS * DEG;
-    var tFall = Math.sqrt(2 * a.y / p.g);
-    var h = function (t) { return a.y - 0.5 * p.g * t * t - p.L0 * Math.sin(a0 + om * t); };
-    var tIn = NaN, tOut = NaN;
-    for (var t = 0; t < tFall; t += 1e-5) {
-      var v = h(t);
-      if (isNaN(tIn) && v < 0) tIn = t;
-      if (!isNaN(tIn) && isNaN(tOut) && v >= 0) { tOut = t; break; }
-    }
-    return { h: h, tFall: tFall, tIn: tIn, tOut: tOut, dipMs: (tOut - tIn) * 1000 };
-  }
-
-  function runNumerics() {
-    var r = SlipSim.simulateStride(LEGACY.p, LEGACY.apex, { scanDt: S.numerics.scanDt, trace: true, traceDt: 0.002 });
-    S.numerics.result = r;
-    return r;
-  }
-
-  function animateNumerics() {
-    var r = S.numerics.result || runNumerics();
-    setAnimSource({ kind: 'slip', t: r.trace.t, x: r.trace.x, phase: r.trace.phase, events: r.events,
-      reason: r.reason, drop: null, p: LEGACY.p }, true);
-  }
-
-  function renderNumerics() {
-    var r = S.numerics.result || runNumerics();
-    var D = legacyDip();
-    var tEnd = Math.min(D.tFall, 0.3);
-    var ts = linspace(0, tEnd, 400);
-    var scan = [];
-    for (var t = 0; t <= tEnd + 1e-12 && scan.length < 2000; t += S.numerics.scanDt) scan.push(t);
-    var showScan = S.numerics.scanDt >= 0.005;
-    var series = [{ x: ts, y: ts.map(D.h), label: 'foot height', style: 0 }];
-    if (showScan) series.push({ x: scan, y: scan.map(D.h), points: true, style: 1, label: 'scan points' });
-    Plot.render($('numCanvas'), {
-      panelHeight: 260,
-      alt: 'Foot height against time in descending flight with the legacy settings. The foot is below the ground from ' +
-        fmt(D.tIn, 3) + ' to ' + fmt(D.tOut, 3) + ' s.',
-      panels: [{ xLabel: 'Time after apex (s)', yLabel: 'Foot height (m)', refs: [{ y: 0 }], legend: 'outside',
-        shade: [{ x0: D.tIn, x1: D.tOut }], series: series }]
-    });
-    var found = r.events.length && r.events[0].guard === 'touchdown';
-    var stepTxt = S.numerics.scanDt < 0.001 ? fmt(S.numerics.scanDt * 1000, 1) + ' ms' : fmt(S.numerics.scanDt * 1000, 0) + ' ms';
-    $('numText').textContent = 'Legacy 2020 settings: leg stiffness 50 kN/m, retraction rate ' + fmt(LEGACY.p.retractionDegPerS, 0) +
-      ' deg/s. The foot is below the ground for ' + fmt(D.dipMs, 1) + ' ms (shaded). With a scan step of ' + stepTxt + ', ' +
-      (found ? 'the scan finds the touchdown at ' + fmt(r.events[0].time, 4) + ' s and the stride completes.' :
-        'no scan point falls inside the dip, the touchdown is missed, and the body falls through the ground (' + (REASONS[r.reason] || r.reason) + '). The 2020 engine missed this touchdown in the same way: flight is a quadratic in time, the solver integrates it exactly, and its steps grow large.');
   }
 
   /* ===================== Ball in a box ===================== */
@@ -1226,8 +1343,9 @@
     $('ballEvents').innerHTML = html + '</tbody>';
     var note = 'Each wall is a guard and each impact a reset: the velocity component normal to the wall reverses and scales by the coefficient of restitution (' +
       fmt(p.restitution, 2) + '). ';
-    note += p.restitution < 1 ? 'With restitution below 1, the floor bounces shorten and their number becomes infinite within a finite time (Zeno behavior); the simulator lets the ball come to rest once its rebound is slow.' :
+    note += p.restitution < 1 ? 'With restitution below 1, the floor bounces shorten and their number becomes infinite within a finite time (Zeno behavior).' :
       'With restitution 1, every impact conserves energy.';
+    if (p.restitution < 1) note += ' A floor rebound slower than the rest speed (' + fmt(p.restSpeed, 3) + ' m/s) leaves the ball sliding on the floor.';
     $('ballNote').textContent = note;
   }
 
@@ -1243,7 +1361,6 @@
       buildSlipDiagram();
       recomputeSlip();
       if (S.tab === 'perturb') { runPerturbation(); renderPerturbation(); }
-      if (S.tab === 'numerics') runNumerics();
     } else {
       buildBallSidebar();
       buildBallDiagram();
@@ -1254,13 +1371,43 @@
   /* ===================== Lessons ===================== */
   var LESSONS = [];
 
+  function memo(fn) {
+    var cache = {};
+    return function (k) { if (!(k in cache)) cache[k] = fn(k); return cache[k]; };
+  }
+  // The same preset gait with a fixed leg angle (no retraction).
+  function fixedPresetState(n) {
+    var st = presetState(n);
+    st.p.legAngleDeg = preset(n).touchdownAngleDeg;
+    st.p.retractionDegPerS = 0;
+    return st;
+  }
+  // Largest drop survived for 20 strides and what happens at the first drop not survived.
+  function dropInfo(st) {
+    var d = SlipSim.dropTest(st.p, st.apex, SlipSim.range(0.01, 0.50, 0.01), 20);
+    var first = d.rows.filter(function (r) { return !r.survived; })[0] || null;
+    return { maxDrop: d.maxDrop, first: first };
+  }
+
   function buildLessons() {
     var st = familyStats(MATLAB_FAMILY) || {};
     var R = {
       preset: function (n) { return preset(n); },
       fam: st,
       f: fmt,
-      numerics: { retraction: LEGACY.p.retractionDegPerS, dipMs: legacyDip().dipMs }
+      clearance: REF.slip.family.footClearance,
+      fixedClearance: function (n) {
+        var pr = preset(n);
+        return pr.apexHeight - pr.L0 * Math.sin(pr.touchdownAngleDeg * DEG);
+      },
+      fallTime: memo(function (n) {
+        var st = presetState(n);
+        var td = SlipSim.simulateStride(st.p, st.apex).events.filter(function (e) { return e.guard === 'touchdown'; })[0];
+        return td ? td.time : NaN;
+      }),
+      fixedLambda: memo(function (n) { var st = fixedPresetState(n); return SlipSim.lambda(st.p, st.apex); }),
+      drop: memo(function (n) { return dropInfo(presetState(n)); }),
+      fixedDrop: memo(function (n) { return dropInfo(fixedPresetState(n)); })
     };
     LESSONS = HDS_LESSONS.build(R);
     var list = $('lessonList');
@@ -1416,6 +1563,7 @@
     csn.addEventListener('change', function () { setCob(parseFloat(csn.value) || 0); });
 
     // Family
+    $('familyClearance').value = REF.slip.family.footClearance;
     $('familyRecompute').addEventListener('click', recomputeFamily);
     $('familyRestore').addEventListener('click', function () {
       S.family = { rows: MATLAB_FAMILY, source: 'matlab' };
@@ -1444,17 +1592,6 @@
 
     // Map
     $('gridBtn').addEventListener('click', computeGrid);
-
-    // Numerical methods
-    Array.prototype.forEach.call(document.querySelectorAll('input[name="scanDt"]'), function (r) {
-      r.addEventListener('change', function () {
-        S.numerics.scanDt = parseFloat(r.value);
-        runNumerics();
-        renderNumerics();
-        updateStatus($('numText').textContent, true);
-      });
-    });
-    $('numAnimate').addEventListener('click', animateNumerics);
 
     window.addEventListener('resize', debounce(redrawAll, 150));
     if (window.matchMedia) {

@@ -83,7 +83,6 @@
           <button type="button" role="tab" id="tab-family" aria-controls="panel-family" aria-selected="false" tabindex="-1">Same speed, different legs</button>
           <button type="button" role="tab" id="tab-perturb" aria-controls="panel-perturb" aria-selected="false" tabindex="-1">Perturbation</button>
           <button type="button" role="tab" id="tab-map" aria-controls="panel-map" aria-selected="false" tabindex="-1">Parameter map</button>
-          <button type="button" role="tab" id="tab-numerics" aria-controls="panel-numerics" aria-selected="false" tabindex="-1">Numerical methods</button>
         </div>
 
         <div role="tabpanel" id="panel-stride" aria-labelledby="tab-stride" class="tabpanel">
@@ -114,6 +113,8 @@
           <h3>Three gaits at the same speed</h3>
           <div class="table-wrap"><table id="familyTable" class="data-table"></table></div>
           <div class="inline-controls">
+            <label for="familyClearance">Minimum foot clearance at apex (m; blank or 0 for a fixed leg angle)</label>
+            <input type="number" id="familyClearance" min="0" max="0.3" step="0.005">
             <button type="button" id="familyRecompute" class="btn">Recompute for current body and speed</button>
             <label class="check"><input type="checkbox" id="familyDrop"> Include the drop test (slower)</label>
             <button type="button" id="familyRestore" class="btn btn-quiet">Show the MATLAB family</button>
@@ -135,7 +136,7 @@
         </div>
 
         <div role="tabpanel" id="panel-map" aria-labelledby="tab-map" class="tabpanel" hidden>
-          <p class="small">Each cell starts from the current apex state with one leg angle and one leg stiffness, and counts the strides completed, up to 20. The other settings come from the sidebar.</p>
+          <p class="small" id="gridIntro">Each cell starts from the current apex state with one leg angle at apex and one leg stiffness, and counts the strides completed, up to 20. The other settings come from the sidebar.</p>
           <div class="inline-controls">
             <label for="gridRes">Grid</label>
             <select id="gridRes"><option value="20" selected>20 x 20</option><option value="40">40 x 40</option></select>
@@ -150,17 +151,6 @@
           <canvas id="gridCanvas" class="plot"></canvas>
         </div>
 
-        <div role="tabpanel" id="panel-numerics" aria-labelledby="tab-numerics" class="tabpanel" hidden>
-          <fieldset class="inline-controls">
-            <legend>Touchdown scan step</legend>
-            <label class="check"><input type="radio" name="scanDt" value="0.0002" checked> 0.2 ms</label>
-            <label class="check"><input type="radio" name="scanDt" value="0.01"> 10 ms</label>
-            <label class="check"><input type="radio" name="scanDt" value="0.15"> 150 ms</label>
-            <button type="button" id="numAnimate" class="btn btn-quiet">Animate this stride</button>
-          </fieldset>
-          <p id="numText"></p>
-          <canvas id="numCanvas" class="plot"></canvas>
-        </div>
       </section>
 
       <!-- ===== Ball in a box analyses ===== -->

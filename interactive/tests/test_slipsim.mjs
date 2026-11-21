@@ -51,6 +51,8 @@ for (const c of asArray(ref.slip.cases)) {
     close(`${c.name}: lambda`, Sim.lambda(p, c.apex), c.lambda, 1e-4);
     const d = Sim.dropTest(p, c.apex, Sim.range(0.01, 0.50, 0.01), 20);
     close(`${c.name}: largest drop survived`, d.maxDrop, c.maxDrop, 1e-9);
+    check(`${c.name}: drop failure mode`, d.dropFailure === String(c.dropFailure || '').replace('terminal:', ''),
+      `js ${d.dropFailure} matlab ${c.dropFailure}`);
   }
 }
 
@@ -73,15 +75,30 @@ for (const c of asArray(ref.slip.cases)) {
   const base = { p: { m: pr.m, L0: pr.L0, k: pr.k, g: pr.g, legAngleDeg: pr.legAngleDeg,
     retractionDegPerS: pr.retractionDegPerS }, y: pr.apexHeight, vx: pr.apexSpeed };
   const kValues = rowsRef.map(r => r.k);
-  const rows = await Sim.stiffnessFamily(base, kValues, fam.target, { drop: false });
+  const rows = await Sim.stiffnessFamily(base, kValues, fam.target,
+    { drop: false, footClearance: fam.footClearance });
   rows.forEach((r, i) => {
     check(`family k=${r.k}: solved`, r.ok);
     if (r.ok) {
-      close(`family k=${r.k}: leg angle`, r.legAngleDeg, rowsRef[i].legAngleDeg, 1e-6);
+      close(`family k=${r.k}: leg angle at apex`, r.legAngleDeg, rowsRef[i].legAngleDeg, 1e-6);
+      close(`family k=${r.k}: retraction rate`, r.retractionDegPerS, rowsRef[i].retractionDegPerS, 1e-5);
+      close(`family k=${r.k}: apex clearance`, r.apexClearance, rowsRef[i].apexClearance, 1e-9);
       close(`family k=${r.k}: peak vertical force`, r.peakVerticalForceBW, rowsRef[i].peakVerticalForceBW, 1e-5, true);
       close(`family k=${r.k}: lambda`, r.lambda, rowsRef[i].lambda, 1e-4);
     }
   });
+}
+
+// ----- Retraction for a foot clearance -----
+{
+  const cc = ref.slip.clearanceCase;
+  const r = Sim.retractionForClearance(cc.p, cc.apex, cc.clearance);
+  close('clearance: leg angle at apex', r.p.legAngleDeg, cc.legAngleDeg, 1e-8);
+  close('clearance: retraction rate', r.p.retractionDegPerS, cc.retractionDegPerS, 1e-6);
+  close('clearance: fall time', r.fallTime, cc.fallTime, 1e-9);
+  const m0 = Sim.returnMap(cc.p, cc.apex), m1 = Sim.returnMap(r.p, cc.apex);
+  close('clearance: periodic gait unchanged (apex height)', m1.y, m0.y, 1e-9);
+  close('clearance: periodic gait unchanged (period)', m1.period, m0.period, 1e-9);
 }
 
 // ----- Ball in a box: impact sequence and times -----

@@ -8,7 +8,11 @@
  *   R.preset(name)  preset row (k, legAngleDeg, apexHeight, lambda, maxDrop, ...)
  *   R.fam           summary of the same-speed stiffness family (see app.js)
  *   R.f(v, d)       number formatted with d decimals
- *   R.numerics      summary of the legacy settings used in lesson 8
+ *   R.clearance     minimum foot clearance at apex used by the presets (m)
+ *   R.fixedClearance(name)  foot clearance at apex with a fixed leg angle (m)
+ *   R.fallTime(name)        time from apex to touchdown (s)
+ *   R.fixedLambda(name)     eigenvalue with a fixed leg angle
+ *   R.drop(name), R.fixedDrop(name)  {maxDrop, first: {height, strides, failure}}
  *
  * Each lesson: id, title, model ('slip' | 'ball'), preset, settings
  * (overrides of slip parameters), tab, goal, body (paragraphs), tasks,
@@ -23,6 +27,13 @@ var HDS_LESSONS = {
     var F = R.fam;
     var f = R.f;
 
+    var edge = function (lam) { return Math.abs(lam) > 0.95 ? ', at the edge of stability' : ''; };
+    var dropLimit = F.dropMaxValue >= 0.5 - 1e-9 ?
+      'reaches the 50 cm limit of the test, first at ' + f(F.kDropMax, 0) + ' kN/m' :
+      'reaches ' + f(F.dropMaxValue * 100, 0) + ' cm at ' + f(F.kDropMax, 0) + ' kN/m';
+    var signText = F.crossings.length ? 'lambda is negative below about ' + f(F.crossings[0].k, 0) + ' kN/m, where errors change sign from stride to stride, and positive above it' :
+      (F.lambdaMax < 0 ? 'lambda is negative for every gait, so errors change sign from stride to stride' : 'lambda is positive for every gait');
+
     return [
       {
         id: 'hybrid',
@@ -34,7 +45,7 @@ var HDS_LESSONS = {
           'A hybrid model joins continuous motion and instantaneous events. Between impacts the ball moves in ballistic flight under gravity. These equations of motion are the flow of the model.',
           'Each wall defines a guard: a function of the state that reaches zero when the ball touches that wall. When a guard fires, a reset map changes the state at once. Here the velocity component normal to the wall reverses and shrinks by the coefficient of restitution, and the tangential component stays the same.',
           'The diagram beside the animation lists the phase, its guards and its resets. The toolkit describes every model on this page, from this ball to the running model, in the same terms.',
-          'With a coefficient of restitution below 1, each floor impact removes kinetic energy. The bounces on the floor become shorter, and their number becomes infinite within a finite time. Hybrid systems with this property show Zeno behavior. The simulator stops the bouncing once the rebound speed falls below a small threshold and lets the ball slide along the floor.'
+          'With a coefficient of restitution below 1, each floor impact removes kinetic energy. The bounces on the floor become shorter, and their number becomes infinite within a finite time. Hybrid systems with this property show Zeno behavior. The simulator stops the bouncing once a floor rebound is slower than the rest speed setting, and the ball then slides along the floor in a second phase.'
         ],
         tasks: [
           'Set the coefficient of restitution to 1 and watch the energy panel. Then set it to 0.5.',
@@ -96,7 +107,7 @@ var HDS_LESSONS = {
           'A gait is periodic when the apex state returns to its starting value after one stride. The return map links the apex height at one stride to the apex height at the next. A periodic gait is a fixed point of the map, where its curve crosses the identity line.',
           'The slope of the map at the fixed point, lambda, sets the fate of a small error in apex height. With |lambda| < 1 the error shrinks each stride and the gait is locally stable; with |lambda| > 1 it grows. A negative lambda makes the error change sign each stride, which appears as a zigzag in the cobweb.',
           'The model conserves mechanical energy, so a change in energy neither grows nor decays: the full two-dimensional apex map has one eigenvalue equal to 1. The map in this tab holds the energy fixed and isolates the remaining eigenvalue, lambda (Holmes et al. 2006).',
-          'With a fixed leg angle, self-stable running in this model needs a suitable pairing of leg stiffness and leg angle, and a minimum speed (Seyfarth et al. 2002). The baseline gait has lambda = ' + f(h.lambda, 2) + '.'
+          'With a fixed leg angle, self-stable running in this model needs a suitable pairing of leg stiffness and leg angle, and a minimum speed (Seyfarth et al. 2002). The baseline preset uses swing-leg retraction (lesson 6) and has lambda = ' + f(h.lambda, 2) + '; the same gait with a fixed leg angle has lambda = ' + f(R.fixedLambda('human'), 2) + '.'
         ],
         tasks: [
           'Move the cobweb start and count the strides needed to return within 1 mm of the fixed point.',
@@ -114,41 +125,41 @@ var HDS_LESSONS = {
         tab: 'family',
         goal: 'Compare running gaits that share one average speed and step frequency but use different leg stiffness.',
         body: [
-          'At a given speed the model admits many periodic gaits. With the average speed held at ' + f(F.speed, 1) + ' m/s and the step frequency at ' + f(F.frequency, 1) + ' steps per second, each leg stiffness has its own leg angle, apex height and contact time. The Same speed tab follows this family from ' + f(F.kMin, 0) + ' to ' + f(F.kMax, 0) + ' kN/m.',
+          'At a given speed the model admits many periodic gaits. With the average speed held at ' + f(F.speed, 1) + ' m/s and the step frequency at ' + f(F.frequency, 1) + ' steps per second, each leg stiffness has its own touchdown angle, apex height and contact time. The Same speed tab follows this family from ' + f(F.kMin, 0) + ' to ' + f(F.kMax, 0) + ' kN/m.',
           'A stiffer leg lands at a steeper angle, compresses less and stays on the ground for a shorter time. The average vertical force over a stride equals body weight, so a shorter contact needs a higher peak force: ' + f(lo.peakVerticalForceBW, 2) + ' body weights at ' + f(lo.k / 1000, 0) + ' kN/m and ' + f(hi.peakVerticalForceBW, 2) + ' body weights at ' + f(hi.k / 1000, 0) + ' kN/m.',
           'The model does no net work over a stride, so any energy cost needs a proxy. The positive leg work per distance is the mechanical work by the legs if the spring returned no energy; it falls with stiffness, since a stiff leg stores less elastic energy. The force-time cost index, the inverse of contact time, follows the force-time hypothesis of Kram and Taylor (1990); it rises with stiffness. The two proxies rank the gaits in opposite order.',
-          'Stability has two aspects here. The eigenvalue lambda measures how fast a small error decays. The drop test measures the largest unexpected drop in the ground that the gait survives for 20 strides. In this family, |lambda| < 1 from ' + f(F.kStableMin, 0) + ' to ' + f(F.kStableMax, 0) + ' kN/m, |lambda| is smallest near ' + f(F.kBest, 0) + ' kN/m, and the largest drop survived reaches ' + f(F.dropMax * 100, 0) + ' cm at ' + f(F.kDropMax, 0) + ' kN/m.',
-          'Daley and Usherwood (2010) proposed the normalized maximum drop, a kinematic measure, which predicts that compliant legs negotiate relatively larger drops. The drop test on this page holds the leg angle fixed and counts strides to failure. The two measures address different questions about stability.'
+          'Every gait in the family uses swing-leg retraction where needed to keep the foot ' + f(R.clearance * 100, 0) + ' cm above the ground at apex (lesson 6). Retraction leaves each gait unchanged, so the forces and timing match the same gaits with a fixed leg angle; it changes only the stability.',
+          'Stability has two aspects here. The eigenvalue lambda measures how fast a small error decays; the drop test measures the largest unexpected drop in the ground that the gait survives for 20 strides. In this family ' + signText + '. lambda is most negative (' + f(F.lambdaMin, 2) + ') at ' + f(F.kLambdaMin, 0) + ' kN/m' + edge(F.lambdaMin) + ', and |lambda| is smallest near ' + f(F.kBest, 0) + ' kN/m. The largest drop survived ' + dropLimit + ', against ' + f(lo.maxDrop * 100, 0) + ' cm for the low-stiffness preset.',
+          'Daley and Usherwood (2010) proposed the normalized maximum drop, a kinematic measure, which predicts that compliant legs negotiate relatively larger drops. The drop test on this page holds the leg control fixed and counts strides to failure. The two measures address different questions about stability.'
         ],
         tasks: [
-          'Load the three presets in turn and compare contact time, peak force and lambda.',
+          'Load the three presets in turn and compare contact time, peak force, retraction rate and lambda.',
           'In the Perturbation tab, press Compare the three presets with a 5 cm drop.',
-          'Change the body mass, press Find periodic gait, then Recompute for current body and speed.'
+          'Recompute the family with the minimum foot clearance left blank (a fixed leg angle) and compare the eigenvalue panel.'
         ],
         question: 'Two gaits run at the same speed and step frequency. One leg is twice as stiff as the other. Which gait has the higher peak vertical force, and why?',
         answer: 'The stiffer leg. Both gaits have the same step period and the same average vertical force, one body weight. The stiffer leg delivers that impulse during a shorter contact, which needs a higher peak force.'
       },
       {
         id: 'retraction',
-        title: '6. Swing-leg retraction',
+        title: '6. Swing-leg retraction and foot clearance',
         model: 'slip',
         preset: 'human',
-        settings: { retractionDegPerS: 20 },
         tab: 'returnMap',
-        goal: 'See how rotating the leg rearward before touchdown changes stability while the periodic gait stays the same.',
+        goal: 'See how rotating the leg rearward before touchdown lifts the foot at apex, leaves the gait unchanged, and changes stability.',
         body: [
           'Running animals often rotate the swing leg rearward just before ground contact, and in the spring-mass model this retraction can stabilize running (Seyfarth et al. 2003). In the model the leg angle is set at apex and then rotates at the retraction rate during descending flight, so the touchdown angle depends on the time spent falling.',
-          'After a stride that ends higher than the periodic gait, the runner falls for longer and a retracting leg lands at a steeper angle. That automatic adjustment changes lambda. With speed and step frequency held fixed, the periodic gait keeps the same touchdown angle, contact time and forces; only the leg angle at apex changes.',
-          'In guinea fowl running over an unexpected drop, the limb contact angle explained most of the variation in stance-phase limb loading (Daley and Biewener 2006), and swing-leg trajectories closely matched simulations optimized to regulate leg loading (Blum et al. 2014).',
-          'This lesson starts from the baseline apex state with a retraction rate of 20 deg/s. Press Find periodic gait to restore a periodic gait at the target speed and step frequency.'
+          'With a fixed leg angle the foot hangs low at apex: in the three presets it sits only ' + f(R.fixedClearance('humanLowStiffness') * 100, 1) + ', ' + f(R.fixedClearance('human') * 100, 1) + ' and ' + f(R.fixedClearance('humanHighStiffness') * 100, 1) + ' cm above the ground, so a small loss of apex height places the foot below the ground and ends the run. Retraction starts the leg at a shallower angle at apex, which lifts the foot to ' + f(R.clearance * 100, 0) + ' cm, and rotates it to the same touchdown angle at the same touchdown time. The periodic gait, with its stance, forces, speed and step frequency, stays the same.',
+          'Retraction changes the response to errors. After a stride that ends higher, the runner falls for longer and a retracting leg lands at a steeper angle. The compliant gait falls for the shortest time from apex to touchdown (' + f(R.fallTime('humanLowStiffness') * 1000, 0) + ' ms at ' + f(lo.k / 1000, 0) + ' kN/m, against ' + f(R.fallTime('humanHighStiffness') * 1000, 0) + ' ms at ' + f(hi.k / 1000, 0) + ' kN/m), so the same clearance needs the fastest retraction (' + f(lo.retractionDegPerS, 0) + ' deg/s, against ' + f(hi.retractionDegPerS, 0) + ' deg/s). That strong correction pushes lambda toward -1: the low-stiffness preset has lambda = ' + f(lo.lambda, 3) + edge(lo.lambda) + ', where the same gait with a fixed leg angle has lambda = ' + f(R.fixedLambda('humanLowStiffness'), 2) + '.',
+          'In guinea fowl running over an unexpected drop, the limb contact angle explained most of the variation in stance-phase limb loading (Daley and Biewener 2006), and swing-leg trajectories closely matched simulations optimized to regulate leg loading (Blum et al. 2014).'
         ],
         tasks: [
-          'Press Find periodic gait and compare lambda with the baseline value of ' + f(h.lambda, 2) + ' at 0 deg/s.',
-          'Raise the retraction rate in steps of 40 deg/s, pressing Find periodic gait each time, until the gait becomes unstable.',
-          'With retraction on, change the apex height and watch the touchdown angle readout.'
+          'With the baseline preset loaded, press Fixed leg angle and read the foot clearance and lambda. Then press Set retraction for this clearance.',
+          'Raise the minimum foot clearance to 0.08 m, press Set retraction for this clearance, and compare lambda.',
+          'Load the low-stiffness preset and note its retraction rate and lambda.'
         ],
-        question: 'Why does retraction leave the periodic gait unchanged when speed and step frequency are held fixed?',
-        answer: 'The stride depends on the leg angle at touchdown. The gait solver lowers the leg angle at apex so that, after rotating during the fall time of the periodic gait, the leg reaches the same touchdown angle. Retraction changes only how the touchdown angle responds to a change in fall time.'
+        question: 'Why does retraction leave the periodic gait unchanged?',
+        answer: 'The stride depends on the leg angle at touchdown and on the touchdown time. Retraction starts from a shallower angle at apex and rotates the leg at the rate that brings it to the original touchdown angle at the original touchdown time, so stance and the rest of the stride repeat. Only the response to a change in fall time differs.'
       },
       {
         id: 'drop',
@@ -156,38 +167,20 @@ var HDS_LESSONS = {
         model: 'slip',
         preset: 'human',
         tab: 'perturb',
-        goal: 'Follow a gait through an unexpected drop in the ground.',
+        goal: 'Follow a gait through an unexpected drop in the ground and identify how it fails.',
         body: [
-          'A drop in the ground during flight lets the body fall farther before touchdown. In the model, the apex height above the new ground rises by the drop height at the same forward speed, which adds m g h of mechanical energy.',
-          'With no damping, the runner keeps that energy. A stable gait settles toward a new periodic gait at a higher speed; an unstable gait falls or reverses.',
-          'The Perturbation tab applies one drop after the first stride and plots apex height and speed stride by stride. The largest drop survived for 20 strides is ' + f(lo.maxDrop * 100, 0) + ' cm for the low-stiffness preset, ' + f(h.maxDrop * 100, 0) + ' cm for the baseline and ' + f(hi.maxDrop * 100, 0) + ' cm for the high-stiffness preset.'
+          'A drop in the ground during flight lets the body fall farther before touchdown. In the model, the apex height above the new ground rises by the drop height at the same forward speed, which adds m g h of mechanical energy, and the model has no damping to remove it.',
+          'With swing-leg retraction, the longer fall after a drop gives the leg more time to rotate, so it lands at a steeper angle, and the next apex undershoots. For each preset the smallest drop that ends the run within 20 strides (' + f(R.drop('humanLowStiffness').first.height * 100, 0) + ', ' + f(R.drop('human').first.height * 100, 0) + ' and ' + f(R.drop('humanHighStiffness').first.height * 100, 0) + ' cm for the low-stiffness, baseline and high-stiffness presets) completes ' + (R.drop('human').first.strides === 1 ? 'one stride' : f(R.drop('human').first.strides, 0) + ' strides') + ' after the drop; the apex at the end of that stride falls below the height needed to place the leg. The run ends through overcorrection on the first stride after the drop, even though each unperturbed stride starts with the foot ' + f(R.clearance * 100, 0) + ' cm above the ground.',
+          'With a fixed leg angle, the same gaits survive drops of ' + f(R.fixedDrop('humanLowStiffness').maxDrop * 100, 0) + ', ' + f(R.fixedDrop('human').maxDrop * 100, 0) + ' and ' + f(R.fixedDrop('humanHighStiffness').maxDrop * 100, 0) + ' cm, and the first drop not survived ends the run ' + f(R.fixedDrop('humanLowStiffness').first.strides, 0) + ', ' + f(R.fixedDrop('human').first.strides, 0) + ' and ' + f(R.fixedDrop('humanHighStiffness').first.strides, 0) + ' strides after the drop, as the error builds over several strides.',
+          'The Perturbation tab applies one drop after the first stride, plots apex height and speed stride by stride, and reports the stride at which a run stops.'
         ],
         tasks: [
           'Set the drop to 5 cm and press Compare the three presets.',
-          'Find the largest drop that the baseline gait survives and compare it with the Same speed tab.',
-          'Add a retraction rate of 20 deg/s, press Find periodic gait, and repeat the drop.'
+          'Find the smallest drop that stops the baseline gait and read the stride at which it stops.',
+          'Press Fixed leg angle in the sidebar and repeat the same drop.'
         ],
-        question: 'Where does the energy added by the drop go in this model?',
-        answer: 'It stays in the runner. The model has no damping, so the added energy appears as a higher forward speed and a different apex height in the strides after the drop.'
-      },
-      {
-        id: 'numerics',
-        title: '8. Numerical methods: missed events',
-        model: 'slip',
-        preset: 'human',
-        tab: 'numerics',
-        goal: 'See how an event detector can step over a guard, and why the toolkit limits the step.',
-        body: [
-          'A solver finds a guard by checking its sign at the ends of each step. With fast leg retraction, the foot can dip below the ground and come back up within one step. If no check falls inside the dip, the solver never registers the touchdown and the body falls through the ground.',
-          'The Numerical methods tab uses the 2020 default settings of the legacy engine, with a retraction rate of ' + f(R.numerics.retraction, 0) + ' deg/s. The foot stays below the ground for ' + f(R.numerics.dipMs, 0) + ' ms. A scan step of 0.2 ms finds the touchdown; a scan step of 150 ms misses it.',
-          'Flight is a quadratic in time, which the solver integrates exactly, so its error estimate stays near zero and its steps grow large. The 2020 engine missed this touchdown at some tolerance settings for that reason. The toolkit limits the solver step during descending flight in MATLAB, and this page solves flight in closed form and scans the foot height every 0.2 ms.'
-        ],
-        tasks: [
-          'Select each scan step and read the outcome.',
-          'Compare the dip duration with the scan step that first misses the touchdown.'
-        ],
-        question: 'Why does a smaller error tolerance not prevent a missed touchdown in flight?',
-        answer: 'The solver integrates the quadratic flight motion exactly, so its error estimate stays near zero at any tolerance and the steps stay large. A limit on the step size, or a guard that changes sign only once per phase, prevents the miss.'
+        question: 'Why does a retracting leg land at a steeper angle after a drop?',
+        answer: 'The leg rotates at a constant rate from apex. A drop lengthens the fall from apex to touchdown, so the leg rotates for longer and reaches a steeper angle at touchdown.'
       }
     ];
   }

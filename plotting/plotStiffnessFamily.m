@@ -9,19 +9,21 @@ function f = plotStiffnessFamily(T, highlight)
 %               preset table from slip_defaults); these gaits are marked
 %               with circles in every panel
 %
-%   Six panels against leg stiffness, all at the same average speed:
-%   peak vertical force, contact time, positive leg work per distance,
-%   force-time cost index, stride-to-stride eigenvalue (lambda; the
-%   dotted lines at -1 and +1 bound the stable range) and the largest
-%   drop survived.
+%   Eight panels against leg stiffness, all at the same average speed:
+%   touchdown angle, swing-leg retraction rate, peak vertical force,
+%   contact time, positive leg work per distance, force-time cost index,
+%   stride-to-stride eigenvalue (lambda; the dotted lines at -1 and +1
+%   bound the stable range) and the largest drop survived.
 
 if nargin < 2, highlight = table(); end
 S = daleyStyle('teaching');
-f = S.figure('double', 2, 0.30);
-tl = tiledlayout(f, 2, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
+f = S.figure('double', 2, 0.28);
+tl = tiledlayout(f, 2, 4, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 kk = T.k / 1000;
 panels = {
+    "touchdownAngleDeg",       "Touchdown angle (deg)"
+    "retractionDegPerS",       "Retraction rate (deg/s)"
     "peakVerticalForceBW",     "Peak vertical force (BW)"
     "contactTime",             "Contact time (s)"
     "positiveWorkPerDistance", "Positive leg work (J kg^{-1} m^{-1})"
@@ -45,7 +47,7 @@ for i = 1:size(panels, 1)
         b = S.points(j + 1);
         h(j) = plot(ax, kk(r), y(r), b{:});
     end
-    if i == 1 && ~isempty(h)
+    if i == 3 && ~isempty(h)
         legend(h, highlight.label, 'Box', 'off', 'Location', 'northwest', 'FontSize', 10);
     end
     xlabel(ax, 'Leg stiffness (kN/m)');

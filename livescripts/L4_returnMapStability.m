@@ -6,7 +6,7 @@ run(fullfile(here, '..', 'setupHybridDynamics.m'));
 [p, apex] = slip_defaults("human");
 %[text] ## 1. Find a periodic gait
 %[text] `slip_findGait` adjusts the apex state and the leg angle until the apex height repeats, at a chosen average speed and step frequency.
-q = p; q.k = 15000;
+q = p; q.k = 15000; q.retractionDegPerS = 0;   % fixed leg angle for this search
 target = struct('meanSpeed', 4, 'hold', "stepFrequency", 'stepFrequency', 3);
 [gait, info] = slip_findGait(q, target, struct('y', 0.94, 'vx', 4.1, 'legAngleDeg', 66));
 fprintf('%s: leg angle %.3f deg, apex %.4f m at %.4f m/s\n', info.message, gait.p.legAngleDeg, gait.y, gait.vx);

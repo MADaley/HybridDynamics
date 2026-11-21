@@ -18,6 +18,12 @@ target.meanSpeed     = presets.meanSpeed(presets.name == "human");      % 4 m/s
 target.hold          = "stepFrequency";
 target.stepFrequency = presets.stepFrequency(presets.name == "human");  % 3 steps/s
 
+%% ===== USER SETTINGS: swing leg =====
+% Minimum foot height above the ground at apex (m). Gaits whose foot sits
+% lower get swing-leg retraction from apex that lifts it to this height;
+% retraction leaves each periodic gait unchanged. NaN: fixed leg angle.
+footClearance = 0.05;
+
 %% ===== USER SETTINGS: stiffness range and output =====
 kValues     = (6:1:35) * 1000;    % leg stiffness values (N/m)
 runDropTest = true;               % adds about 30 s
@@ -26,12 +32,13 @@ saveResults = true;
 %% 1. Solve the family by continuation from the baseline gait
 base = struct('p', p, 'y', apex.y, 'vx', apex.vx);
 tic;
-T = slip_stiffnessFamily(base, kValues, target, struct('terrain', runDropTest));
+T = slip_stiffnessFamily(base, kValues, target, ...
+    struct('terrain', runDropTest, 'footClearance', footClearance));
 fprintf('Solved %d of %d gaits in %.0f s.\n', sum(~isnan(T.legAngleDeg)), height(T), toc);
 
 %% 2. Compare the three presets
-show = ["k" "legAngleDeg" "contactTime" "dutyFactor" "peakVerticalForceBW" ...
-    "legCompressionPct" "positiveWorkPerDistance" "forceTimeCostIndex" "lambda" "maxDrop"];
+show = ["k" "touchdownAngleDeg" "legAngleDeg" "retractionDegPerS" "contactTime" ...
+    "peakVerticalForceBW" "positiveWorkPerDistance" "forceTimeCostIndex" "lambda" "maxDrop" "dropFailure"];
 [~, rows] = ismember(presets.k, T.k);
 disp(T(rows, show));
 

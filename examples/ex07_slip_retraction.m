@@ -1,8 +1,8 @@
 %% EX07_SLIP_RETRACTION  Swing-leg retraction and stride-to-stride stability
 % Purpose : rotate the leg rearward during the descending flight phase and
-%           see how the retraction rate changes the touchdown angle and the
-%           eigenvalue of the apex return map, at the same average speed
-%           and step frequency.
+%           see how the retraction rate changes the leg angle at apex, the
+%           foot clearance at apex and the eigenvalue of the apex return
+%           map, at the same average speed and step frequency.
 % Model   : models/slip
 % Outputs : table and figure on screen
 % Requires: none (the script adds the toolkit to the path)
@@ -24,7 +24,9 @@ target.stepFrequency = presets.stepFrequency(presets.name == "human");
 %% 1. Solve the periodic gait for each retraction rate (continuation)
 n = numel(retractionRates);
 lambda = nan(n, 1); apexAngle = nan(n, 1); tdAngle = nan(n, 1); Fv = nan(n, 1);
-guess = struct('y', apex.y, 'vx', apex.vx, 'legAngleDeg', p.legAngleDeg);
+clearance = nan(n, 1);
+tdAngle0 = presets.touchdownAngleDeg(presets.name == "human");
+guess = struct('y', apex.y, 'vx', apex.vx, 'legAngleDeg', tdAngle0);
 for i = 1:n
     q = p;
     q.retractionDegPerS = retractionRates(i);
@@ -37,9 +39,11 @@ for i = 1:n
     apexAngle(i) = g.p.legAngleDeg;
     tdAngle(i) = M.touchdownAngleDeg;
     Fv(i) = M.peakVerticalForceBW;
+    clearance(i) = g.y - g.p.L0 * sind(g.p.legAngleDeg);
 end
-T = table(retractionRates(:), apexAngle, tdAngle, Fv, lambda, 'VariableNames', ...
-    {'retractionDegPerS', 'apexLegAngleDeg', 'touchdownAngleDeg', 'peakVerticalForceBW', 'lambda'});
+T = table(retractionRates(:), apexAngle, tdAngle, 100 * clearance, Fv, lambda, 'VariableNames', ...
+    {'retractionDegPerS', 'apexLegAngleDeg', 'touchdownAngleDeg', 'apexClearanceCm', ...
+    'peakVerticalForceBW', 'lambda'});
 disp(T);
 
 %% 2. Plot

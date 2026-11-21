@@ -6,8 +6,10 @@ run(fullfile(here, '..', 'setupHybridDynamics.m'));
 %[text] ## 1. The baseline gait
 %[text] The baseline preset is a periodic gait of an 80 kg runner with a 1 m leg, at an average speed of 4 m/s and 3 steps per second. Its relative leg stiffness $k L_0 / (m g)$ is close to the value of 15 used by McMahon and Cheng (1990) for human running.
 [p, apex] = slip_defaults("human");
-fprintf('Leg stiffness %.0f N/m, relative stiffness %.1f, leg angle at apex %.2f deg\n', ...
-    p.k, p.k * p.L0 / (p.m * p.g), p.legAngleDeg);
+fprintf('Leg stiffness %.0f N/m, relative stiffness %.1f\n', p.k, p.k * p.L0 / (p.m * p.g));
+fprintf('Leg angle at apex %.2f deg, retraction %.1f deg/s, foot clearance at apex %.1f cm\n', ...
+    p.legAngleDeg, p.retractionDegPerS, 100 * (apex.y - p.L0 * sind(p.legAngleDeg)));
+%[text] The swing leg retracts (rotates rearward) from apex at a constant rate. At apex the foot is held 5 cm above the ground; the leg then reaches its touchdown angle as the body falls.
 %[text] ## 2. Simulate one stride
 M = slip_metrics(p, [apex.y; apex.vx]);
 M.trace.events(:, {'time', 'from', 'guard', 'to'})

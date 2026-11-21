@@ -99,11 +99,39 @@ end
 function testFindGaitStepFrequency(testCase)
 p = testCase.TestData.p;
 p.k = 15000;
+p.retractionDegPerS = 0;              % fixed leg angle; the guess is a touchdown angle
 target = struct('meanSpeed', 4, 'hold', "stepFrequency", 'stepFrequency', 3);
 [g, info] = slip_findGait(p, target, struct('y', 0.94, 'vx', 4.1, 'legAngleDeg', 66));
 verifyTrue(testCase, info.converged);
 verifyEqual(testCase, g.meanSpeed, 4, 'AbsTol', 1e-6);
 verifyEqual(testCase, 1 / g.period, 3, 'AbsTol', 1e-6);
+end
+
+function testRetractionForClearanceKeepsGait(testCase)
+% Retraction for a foot clearance changes the leg angle at apex but leaves
+% the periodic gait (apex state, period, touchdown angle) unchanged.
+P = testCase.TestData.presets;
+for i = 1:height(P)
+    [p, a] = slip_defaults(P.name(i));
+    verifyEqual(testCase, a.y - p.L0 * sind(p.legAngleDeg), P.apexClearance(i), 'AbsTol', 1e-12);
+    q = p; q.legAngleDeg = P.touchdownAngleDeg(i); q.retractionDegPerS = 0;   % fixed leg angle
+    [q2, info] = slip_retractionForClearance(q, a, 0.08);
+    verifyEqual(testCase, a.y - q2.L0 * sind(q2.legAngleDeg), 0.08, 'AbsTol', 1e-12);
+    verifyEqual(testCase, info.touchdownAngleDeg, P.touchdownAngleDeg(i), 'AbsTol', 1e-8);
+    [s0, i0] = slip_returnMap(q, [a.y; a.vx]);
+    [s2, i2] = slip_returnMap(q2, [a.y; a.vx]);
+    verifyEqual(testCase, s2, s0, 'AbsTol', 1e-8, P.name(i));
+    verifyEqual(testCase, i2.period, i0.period, 'AbsTol', 1e-9, P.name(i));
+    M = slip_metrics(q2, [a.y; a.vx]);
+    verifyEqual(testCase, M.touchdownAngleDeg, P.touchdownAngleDeg(i), 'AbsTol', 1e-6, P.name(i));
+end
+end
+
+function testDropFailureModeReported(testCase)
+[p, a] = slip_defaults("human");
+S = slip_stability(p, [a.y; a.vx], struct('jacobian', false));
+verifyNotEmpty(testCase, S.dropFailure);
+verifyTrue(testCase, startsWith(S.dropFailure, "terminal:"));
 end
 
 function testStrideFailureIsReported(testCase)

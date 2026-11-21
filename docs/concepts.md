@@ -51,7 +51,11 @@ Near the fixed point, small errors evolve by the Jacobian of the map (`hde.retur
 
 Coupled states must stay consistent when the section state is perturbed. For the runner the foot position depends on the apex height and the leg angle, so `slip_apexState` rebuilds it from the apex state. The 2020 code perturbed the body height with the foot held fixed, which also changed the leg angle and raised the computed eigenvalue by 8 %.
 
-## 6. Writing a new model
+## 6. Swing-leg retraction and foot clearance
+
+In the SLIP model the leg is set to an angle at apex and rotates rearward at a constant rate during descending flight. For a periodic gait, `slip_retractionForClearance` chooses the apex angle that holds the foot a given height above the ground and the rate that brings the leg to the original touchdown angle at the original touchdown time. The body follows the same ballistic path, so the periodic gait is unchanged; only the response to perturbations changes. `slip_stiffnessFamily` applies this to every gait whose foot clearance at apex falls below `footClearance`.
+
+## 7. Writing a new model
 
 1. Copy `models/ballInBox/ballInBox_model.m` (one or two phases) or `models/slip/slip_model.m` (several phases with coordinate changes).
 2. List the states. Write one flow function per phase, in the phase's own coordinates.

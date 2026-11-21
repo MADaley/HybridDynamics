@@ -33,15 +33,17 @@ Every example and lesson script begins with labeled blocks of user settings (par
 
 ## The spring-mass runner presets
 
-Three periodic gaits of an 80 kg runner with a 1 m leg share an average speed of 4 m/s and 3 steps per second; they differ in leg stiffness and therefore in leg angle. Values come from `models/slip/slip_presets.csv`, written by `tools/slip_computePresets.m`.
+Three periodic gaits of an 80 kg runner with a 1 m leg share an average speed of 4 m/s and 3 steps per second; they differ in leg stiffness and therefore in touchdown angle. Each swing leg retracts (rotates rearward) from apex at the rate that holds the foot 5 cm above the ground at apex and still lands at the same angle and time. With a fixed leg angle the foot of these gaits sits only 0.6 to 3 cm above the ground at apex, and small changes in apex height end the run. Values come from `models/slip/slip_presets.csv`, written by `tools/slip_computePresets.m` (the foot clearance is a setting there).
 
-| Preset | Leg stiffness (kN/m) | Leg angle at touchdown (deg) | Contact time (s) | Peak vertical force (body weights) | Eigenvalue | Largest drop survived (m) |
-|---|---|---|---|---|---|---|
-| `humanLowStiffness` | 8 | 58.52 | 0.264 | 2.05 | -0.587 | 0.03 |
-| `human` (baseline) | 12 | 64.01 | 0.222 | 2.40 | 0.394 | 0.14 |
-| `humanHighStiffness` | 20 | 69.55 | 0.177 | 2.98 | 0.808 | 0.25 |
+| Preset | Leg stiffness (kN/m) | Touchdown angle (deg) | Retraction (deg/s) | Contact time (s) | Peak vertical force (body weights) | Eigenvalue | Largest drop survived (m) |
+|---|---|---|---|---|---|---|---|
+| `humanLowStiffness` | 8 | 58.52 | 130.4 | 0.264 | 2.05 | -0.994 | 0.04 |
+| `human` (baseline) | 12 | 64.01 | 75.9 | 0.222 | 2.40 | -0.692 | 0.06 |
+| `humanHighStiffness` | 20 | 69.55 | 39.3 | 0.177 | 2.98 | -0.009 | 0.28 |
 
-The baseline relative leg stiffness, k L0 / (m g) = 15.3, lies near the value of 15 that McMahon and Cheng (1990) used for human running. The eigenvalue is the slope of the apex-height return map at constant energy: magnitudes below 1 mean that a small error shrinks from stride to stride. The drop test lowers the ground once and counts a gait as surviving when it completes 20 further strides.
+The baseline relative leg stiffness, k L0 / (m g) = 15.3, lies near the value of 15 that McMahon and Cheng (1990) used for human running. The eigenvalue is the slope of the apex-height return map at constant energy: magnitudes below 1 mean that a small error shrinks from stride to stride, and a negative value means the error changes sign each stride. The drop test lowers the ground once and counts a gait as surviving when it completes 20 further strides.
+
+Retraction trades foot clearance against stability. The compliant gait lands soonest after apex, so the same 5 cm clearance needs the fastest retraction, which places it near the stability limit of -1. After a large drop, the longer fall lets a retracting leg rotate further and land steeper, and the next apex undershoots by more than the foot clearance; in this model that is how all three presets fail the drop test.
 
 ## Lessons
 
@@ -54,7 +56,7 @@ The baseline relative leg stiffness, k L0 / (m g) = 15.3, lies near the value of
 | 5 | Same speed, different legs: peak force, leg work, stability | yes | `L5_sameSpeedDifferentLegs.m` |
 | 6 | Swing-leg retraction | yes | `L6_swingLegRetraction.m` |
 | 7 | Unexpected drops in the ground | yes | `L7_unexpectedDrop.m` |
-| 8 | Numerical methods: why events can be missed | yes | `L8_numericalMethods.m` |
+| 8 | Numerical methods: why events can be missed | no | `L8_numericalMethods.m` |
 
 ## Validation
 

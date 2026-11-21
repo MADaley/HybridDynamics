@@ -20,14 +20,15 @@ for name = names
     if n == nStrides
         fprintf('%-20s survived %d strides; final apex speed %.3f m/s\n', name, n, s(2));
     else
-        fprintf('%-20s failed after %d strides (%s)\n', name, n, info.exitReason);
+        fprintf('%-20s failed on stride %d after the drop (%s)\n', name, n + 1, info.exitReason);
     end
 end
+%[text] The failure mode `footBelowGround` means that the next apex was lower than the height needed to place the leg at its apex angle: the foot would meet the ground before the leg is placed. The presets lift the foot 5 cm at apex by swing-leg retraction, so this failure needs an apex that falls more than 5 cm below the periodic gait. After a drop the body falls longer, the retracting leg lands steeper, and the next apex undershoots.
 %[text] ## 2. Largest drop survived
 for name = names
     [p, apex] = slip_defaults(name);
     S = slip_stability(p, [apex.y; apex.vx], struct('jacobian', false));
-    fprintf('%-20s largest drop survived for 20 strides: %.2f m\n', name, S.maxDrop);
+    fprintf('%-20s largest drop survived for 20 strides: %.2f m (first failure: %s)\n', name, S.maxDrop, S.dropFailure);
 end
 %[text] ## Try this
 %[text] Run `ex08_slip_dropStep` to plot apex height and speed stride by stride.

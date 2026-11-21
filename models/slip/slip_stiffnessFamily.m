@@ -7,13 +7,22 @@ function [T, gaits] = slip_stiffnessFamily(base, kValues, target, opts)
 %   base    : a periodic gait from slip_findGait (the starting solution)
 %   kValues : leg stiffness values to solve for (N/m), any order
 %   target  : as in slip_findGait (.meanSpeed, .hold and the held value)
-%   opts    : .stability  compute slip_stability for each gait (true)
-%             .terrain    include the drop test (false; slower)
+%   opts    : .stability     compute slip_stability for each gait (true)
+%             .terrain       include the drop test (false; slower)
+%             .footClearance minimum foot height above the ground at apex
+%                            (m). Gaits whose foot sits lower get swing-leg
+%                            retraction from apex at the rate that lifts the
+%                            foot to this height (slip_retractionForClearance);
+%                            the others keep a fixed leg angle. NaN (default)
+%                            gives a fixed leg angle for every gait.
 %
 %   Starting from the base gait, the function steps through stiffness in
 %   both directions and uses each solution as the guess for the next
 %   (continuation). Every gait has the same average speed, so the table
-%   shows how one speed can be reached with different legs.
+%   shows how one speed can be reached with different legs. Retraction
+%   leaves each periodic gait unchanged and alters only its response to
+%   perturbations, so the gaits are solved with a fixed leg angle and the
+%   retraction is added afterward.
 %
 %   T : one row per stiffness with the leg angle, apex state, timing, peak
 %       forces, leg work, the cost proxies of slip_metrics and the
@@ -24,6 +33,14 @@ function [T, gaits] = slip_stiffnessFamily(base, kValues, target, opts)
 if nargin < 4, opts = struct(); end
 if ~isfield(opts, 'stability'), opts.stability = true; end
 if ~isfield(opts, 'terrain'), opts.terrain = false; end
+if ~isfield(opts, 'footClearance'), opts.footClearance = NaN; end
+
+% Solve the periodic gaits with a fixed leg angle (the touchdown angle of
+% the base gait); retraction does not change them.
+if base.p.retractionDegPerS ~= 0
+    base.p.legAngleDeg = touchdownAngle(base.p, base.y, base.vx);
+    base.p.retractionDegPerS = 0;
+end
 
 kValues = kValues(:)';
 n = numel(kValues);
@@ -69,6 +86,19 @@ for direction = [1, -1]
 end
 
 %% ----- Measures for each gait -----
+% Add swing-leg retraction where the foot clearance at apex is too small.
+for i = 1:n
+    g = gaits{i};
+    if isempty(g) || isnan(opts.footClearance)
+        continue
+    end
+    natural = g.y - g.p.L0 * sind(g.p.legAngleDeg);
+    if natural < opts.footClearance
+        gaits{i}.p = slip_retractionForClearance(g.p, struct('y', g.y, 'vx', g.vx), ...
+            opts.footClearance);
+    end
+end
+
 rows = cell(n, 1);
 for i = 1:n
     rows{i} = familyRow(kValues(i), gaits{i}, opts);
@@ -85,7 +115,8 @@ row = struct('k', k, 'relativeStiffness', NaN, 'legAngleDeg', NaN, ...
     'peakVerticalForceBW', NaN, 'peakLegForceBW', NaN, ...
     'peakBrakingForceBW', NaN, 'peakElasticEnergy', NaN, ...
     'positiveWorkPerDistance', NaN, 'forceTimeCostIndex', NaN, ...
-    'lambda', NaN, 'maxDrop', NaN);
+    'retractionDegPerS', NaN, 'apexClearance', NaN, ...
+    'lambda', NaN, 'maxDrop', NaN, 'dropFailure', "");
 if isempty(g)
     return
 end
@@ -101,12 +132,23 @@ end
 row.legAngleDeg = g.p.legAngleDeg;
 row.apexHeight = g.y;
 row.apexSpeed = g.vx;
+row.retractionDegPerS = g.p.retractionDegPerS;
+row.apexClearance = g.y - g.p.L0 * sind(g.p.legAngleDeg);
 if opts.stability
     S = slip_stability(g.p, [g.y; g.vx], ...
         struct('jacobian', false, 'terrain', opts.terrain));
     row.lambda = S.lambda;
     if opts.terrain
         row.maxDrop = S.maxDrop;
+        row.dropFailure = S.dropFailure;
     end
 end
+end
+
+function a = touchdownAngle(p, y, vx)
+% Leg angle at touchdown (deg) for a stride from apex state (y, vx).
+r = hde.simulate(slip_model(p), slip_apexState(p, y, vx), ...
+    hde.solverDefaults(struct('outputStep', 0, 'maxCycles', 1, 'check', false)));
+x = r.events.xBefore(find(r.events.guard == "touchdown", 1), :);
+a = rad2deg(atan2(x(2) - x(6), x(5) - x(1)));
 end

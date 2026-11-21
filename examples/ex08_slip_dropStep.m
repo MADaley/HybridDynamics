@@ -26,13 +26,15 @@ for j = 1:n
     s = [apex.y + dropHeight; apex.vx];      % apex height above the new ground
     yHist(1, j) = s(1) - apex.y;
     vHist(1, j) = s(2);
+    reason = "survived";
     for i = 1:nStrides
-        s = slip_returnMap(p, s, model);
-        if any(isnan(s)), break, end
+        [s, info] = slip_returnMap(p, s, model);
+        if any(isnan(s)), reason = info.exitReason; break, end
         yHist(i + 1, j) = s(1) - apex.y;
         vHist(i + 1, j) = s(2);
     end
-    fprintf('%-24s strides completed after the drop: %d\n', labels(j), sum(~isnan(yHist(2:end, j))));
+    fprintf('%-24s strides completed after the drop: %2d (%s)\n', labels(j), ...
+        sum(~isnan(yHist(2:end, j))), reason);
 end
 
 %% 2. Plot change in apex height and apex speed after the drop

@@ -14,6 +14,7 @@ run(fullfile(root, 'setupHybridDynamics.m'));
 
 %% ===== USER SETTINGS: stiffness family shown on the page =====
 kValues = (6:1:35) * 1000;        % leg stiffness values (N/m)
+footClearance = 0.05;             % minimum foot height at apex (m), as the presets
 
 %% 1. Settings and presets
 [p, apex, spec, presets] = slip_defaults("human");
@@ -35,11 +36,14 @@ cases{end+1} = slipCase("human, apex +2 cm", p, a2, false, 5);
 % Swing-leg retraction at 60 deg/s from the baseline apex state.
 q = p; q.retractionDegPerS = 60;
 cases{end+1} = slipCase("human, retraction 60 deg/s", q, apex, false, 3);
-% Legacy 2020 defaults: fast retraction carries the foot below ground and back.
+% Fast retraction that carries the foot below the ground and back up.
 legVel = 3 * sqrt(9.81 / 0.667);
 q = struct('m', 80, 'k', 50000, 'L0', 1, 'g', 9.81, ...
     'legAngleDeg', 180 - rad2deg(2.754657), 'retractionDegPerS', rad2deg(legVel));
-cases{end+1} = slipCase("legacy fast retraction", q, struct('y', 0.998622, 'vx', 5), false, 3);
+cases{end+1} = slipCase("fast retraction, foot dips below ground", q, struct('y', 0.998622, 'vx', 5), false, 3);
+% Baseline gait with a fixed leg angle (no retraction).
+q = p; q.legAngleDeg = presets.touchdownAngleDeg(presets.name == "human"); q.retractionDegPerS = 0;
+cases{end+1} = slipCase("human, fixed leg angle", q, apex, true);
 % Failures
 q = p; q.legAngleDeg = 85;
 cases{end+1} = slipCase("leg too steep for the apex", q, apex, false, 1);
@@ -53,8 +57,16 @@ ref.slip.cases = [cases{:}];
 target = struct('meanSpeed', presets.meanSpeed(1), 'hold', "stepFrequency", ...
     'stepFrequency', presets.stepFrequency(1));
 T = slip_stiffnessFamily(struct('p', p, 'y', apex.y, 'vx', apex.vx), kValues, ...
-    target, struct('terrain', true));
+    target, struct('terrain', true, 'footClearance', footClearance));
 ref.slip.family.target = target;
+ref.slip.family.footClearance = footClearance;
+
+%% 3b. Retraction for a foot clearance (reference for the web function)
+q = p; q.legAngleDeg = presets.touchdownAngleDeg(presets.name == "human"); q.retractionDegPerS = 0;
+[q8, info8] = slip_retractionForClearance(q, apex, 0.08);
+ref.slip.clearanceCase = struct('p', q, 'apex', apex, 'clearance', 0.08, ...
+    'legAngleDeg', q8.legAngleDeg, 'retractionDegPerS', q8.retractionDegPerS, ...
+    'fallTime', info8.fallTime, 'touchdownAngleDeg', info8.touchdownAngleDeg);
 ref.slip.family.rows = table2struct(T);
 
 %% 4. Ball in a box
@@ -104,6 +116,7 @@ c.apexSequence = seq;
 c.metrics = [];
 c.lambda = [];
 c.maxDrop = [];
+c.dropFailure = "";
 if periodic
     M = slip_metrics(p, [apex.y; apex.vx]);
     keep = ["period" "contactTime" "flightTime" "stepLength" "meanSpeed" ...
@@ -116,6 +129,7 @@ if periodic
     S = slip_stability(p, [apex.y; apex.vx], struct('jacobian', false));
     c.lambda = S.lambda;
     c.maxDrop = S.maxDrop;
+    c.dropFailure = S.dropFailure;
 end
 end
 

@@ -21,7 +21,10 @@ function S = slip_stability(p, s, opts)
 %              nStrides strides; heights are tested in increasing order
 %              and the scan stops counting at the first failure
 %   S.dropTable  per height: survived (true/false), strides completed,
-%              final apex height and speed
+%              failure mode (the exit reason of the failed stride, for
+%              example "terminal:footBelowGround" when the foot would
+%              start below the ground at apex), final apex height and speed
+%   S.dropFailure  failure mode at the first drop height not survived
 %
 %   The drop occurs during the flight that follows the apex: the apex
 %   height above the new ground rises by the drop height at the same
@@ -62,6 +65,11 @@ end
 %% ----- Unexpected drop in ground height -----
 if opts.terrain
     [S.maxDrop, S.dropTable] = terrainTest(p, model, y0, vx0, opts.heights, opts.nStrides);
+    iFail = find(~S.dropTable.survived, 1);
+    S.dropFailure = "";
+    if ~isempty(iFail)
+        S.dropFailure = S.dropTable.failure(iFail);
+    end
 end
 end
 
@@ -78,13 +86,15 @@ function [maxH, T] = terrainTest(p, model, y0, vx0, heights, nStrides)
 n = numel(heights);
 survived = false(n, 1);
 strides = zeros(n, 1);
+failure = strings(n, 1);
 yEnd = nan(n, 1);
 vxEnd = nan(n, 1);
 for i = 1:n
     s = [y0 + heights(i); vx0];
     for j = 1:nStrides
-        sNext = slip_returnMap(p, s, model);
+        [sNext, info] = slip_returnMap(p, s, model);
         if any(isnan(sNext))
+            failure(i) = info.exitReason;
             break
         end
         s = sNext;
@@ -94,8 +104,8 @@ for i = 1:n
     yEnd(i) = s(1);
     vxEnd(i) = s(2);
 end
-T = table(heights(:), survived, strides, yEnd, vxEnd, 'VariableNames', ...
-    {'height', 'survived', 'strides', 'yEnd', 'vxEnd'});
+T = table(heights(:), survived, strides, failure, yEnd, vxEnd, 'VariableNames', ...
+    {'height', 'survived', 'strides', 'failure', 'yEnd', 'vxEnd'});
 firstFail = find(~survived, 1);
 if isempty(firstFail)
     maxH = heights(end);

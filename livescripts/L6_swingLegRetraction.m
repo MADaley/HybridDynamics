@@ -10,7 +10,9 @@ target = struct('meanSpeed', presets.meanSpeed(1), 'hold', "stepFrequency", ...
 %[text] For each retraction rate, solve the periodic gait at the same average speed and step frequency, then compute $\lambda$.
 rates = 0:20:160;
 lambda = nan(size(rates)); tdAngle = nan(size(rates)); apexAngle = nan(size(rates));
-guess = struct('y', apex.y, 'vx', apex.vx, 'legAngleDeg', p.legAngleDeg);
+clearance = nan(size(rates));
+guess = struct('y', apex.y, 'vx', apex.vx, ...
+    'legAngleDeg', presets.touchdownAngleDeg(presets.name == "human"));
 for i = 1:numel(rates)
     q = p; q.retractionDegPerS = rates(i);
     [g, info] = slip_findGait(q, target, guess);
@@ -19,10 +21,11 @@ for i = 1:numel(rates)
     M = slip_metrics(g.p, [g.y; g.vx]);
     S = slip_stability(g.p, [g.y; g.vx], struct('jacobian', false, 'terrain', false));
     lambda(i) = S.lambda; tdAngle(i) = M.touchdownAngleDeg; apexAngle(i) = g.p.legAngleDeg;
+    clearance(i) = g.y - g.p.L0 * sind(g.p.legAngleDeg);
 end
-table(rates', apexAngle', tdAngle', lambda', 'VariableNames', ...
-    {'retractionDegPerS', 'apexLegAngleDeg', 'touchdownAngleDeg', 'lambda'})
-%[text] The touchdown angle is the same in every row: at this speed and step frequency the periodic gait itself does not change. Only the leg angle at apex changes, to reach the same touchdown angle after the same fall. The eigenvalue changes: retraction couples the touchdown angle to the fall time, and that coupling sets how an error in apex height carries into the next stride.
+table(rates', apexAngle', tdAngle', 100 * clearance', lambda', 'VariableNames', ...
+    {'retractionDegPerS', 'apexLegAngleDeg', 'touchdownAngleDeg', 'apexClearanceCm', 'lambda'})
+%[text] The touchdown angle is the same in every row: at this speed and step frequency the periodic gait itself does not change. Only the leg angle at apex changes, to reach the same touchdown angle after the same fall, and a shallower leg at apex lifts the foot higher above the ground. The eigenvalue changes: retraction couples the touchdown angle to the fall time, and that coupling sets how an error in apex height carries into the next stride. More foot clearance needs faster retraction, which moves $\lambda$ toward $-1$.
 %[text] ## 2. Plot
 St = daleyStyle('teaching');
 f = St.figure('single', 1, 0.8);
