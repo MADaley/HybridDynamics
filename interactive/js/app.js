@@ -86,9 +86,13 @@
      retraction rate. JSON null stands for an infinite value. */
   var RULES = asArray(REF.slip.retractionRules);
   var SWING = asArray(REF.data.swingLeg);
-  var RULE_UNITS = { commonPerCycle: 'deg per gait cycle', common: 'deg/s', clearance: 'm' };
+  var RULE_UNITS = { commonPerCycle: 'deg per gait cycle', common: 'deg/s', clearance: 'cm' };
+  // The rule value box shows foot clearance in cm; the simulator takes m.
+  var RULE_SCALE = { clearance: 100 };
+  function ruleToBox(rule, v) { return round(v * (RULE_SCALE[rule] || 1), 4); }
+  function ruleFromBox(rule, text) { return parseFloat(text) / (RULE_SCALE[rule] || 1); }
   // Arrow increment of the rule value box: 1 deg, 1 deg/s, 1 cm.
-  var RULE_SPIN = { commonPerCycle: 1, common: 1, clearance: 0.01 };
+  var RULE_SPIN = { commonPerCycle: 1, common: 1, clearance: 1 };
   var RULE_SHORT = { fixed: 'fixed', commonPerCycle: 'human', common: 'common', clearance: '5 cm',
     fastestRecovery: 'fastest', groundSpeedMatching: 'GSM' };
   function cap(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
@@ -341,7 +345,7 @@
       row.hidden = !ruleNeedsValue(r.rule);
       lab.textContent = 'Value (' + (RULE_UNITS[r.rule] || '') + ')';
       inp.step = RULE_SPIN[r.rule] || 'any';
-      if (ruleNeedsValue(r.rule)) inp.value = r.value;
+      if (ruleNeedsValue(r.rule)) inp.value = ruleToBox(r.rule, r.value);
     };
     sel.addEventListener('change', sync);
     sync();
@@ -356,7 +360,7 @@
 
   function applyRule() {
     var r = RULES[S.ruleIndex];
-    var v = ruleNeedsValue(r.rule) ? parseFloat($('ruleValue').value) : r.value;
+    var v = ruleNeedsValue(r.rule) ? ruleFromBox(r.rule, $('ruleValue').value) : r.value;
     if (!S.periodic) {
       updateStatus('The current apex state is not periodic. Press Find periodic gait or load a preset, then apply the rule.', true);
       return;
@@ -1452,7 +1456,7 @@
     var btn = $('familyRecompute'), prog = $('familyProgress');
     var target = { meanSpeed: S.target.meanSpeed, hold: 'stepFrequency', stepFrequency: S.target.stepFrequency };
     var rule = $('familyRule').value;
-    var rv = parseFloat($('familyRuleValue').value);
+    var rv = ruleFromBox(rule, $('familyRuleValue').value);
     if (ruleNeedsValue(rule) && !isFinite(rv)) {
       updateStatus('Enter a value for the retraction rule.', true);
       return;
@@ -2241,7 +2245,7 @@
       $('familyRuleValueLabel').hidden = !need;
       $('familyRuleValueLabel').textContent = 'Value (' + (RULE_UNITS[r] || '') + ')';
       $('familyRuleValue').step = RULE_SPIN[r] || 'any';
-      if (need) $('familyRuleValue').value = round(FR_DEFAULT[r], 2);
+      if (need) $('familyRuleValue').value = ruleToBox(r, round(FR_DEFAULT[r], 2));
     };
     $('familyRule').addEventListener('change', syncFamilyRule);
     syncFamilyRule();
