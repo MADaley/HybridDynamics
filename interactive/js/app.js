@@ -123,6 +123,7 @@
     lambda: NaN,
     cobwebStart: 0.01,
     ruleIndex: 1,
+    portrait: { on: false, dy: 0.02, n: 6, follow: 'gait', run: null, key: '', tA: null, tB: null, failed: '' },
     retr: null,
     nmd: null,
     family: { rows: MATLAB_FAMILY, source: 'matlab' },
@@ -513,7 +514,7 @@
       }
     }
     return { kind: 'slip', t: tr.t, x: tr.x, phase: tr.phase, events: tr.events,
-      reason: run.reason, drop: drop, dropIndex: dropIndex, p: run.p || S.p };
+      reason: run.reason, drop: drop, dropIndex: dropIndex, p: run.p || S.p, runRef: run };
   }
 
   function setAnimSource(src, autoplay) {
@@ -638,6 +639,7 @@
     ctx.fillText(PHASE_LABEL[phaseName] + (ended ? ' (run stopped: ' + src.reason + ')' : ''), 10, 8);
     $('timeReadout').textContent = 't = ' + fmt(src.t[i], 3) + ' s';
     highlightPhase(ended ? 'END' : phaseName);
+    drawPortraitDots();
   }
 
   var PHASE_LABEL = { flightDown: 'Descending flight', stance: 'Stance', flightUp: 'Ascending flight' };
@@ -822,6 +824,7 @@
 
   /* ----- Stride tab ----- */
   function renderStride() {
+    renderPortraits();
     var M = S.M, msg = $('strideMessage');
     var table = $('measuresTable');
     if (!M || !M.ok) {
@@ -912,6 +915,179 @@
       }
       btn.disabled = false;
     }, 20);
+  }
+
+  /* ----- Phase portraits (Stride tab) ----- */
+  // Body height against vertical velocity (A) and leg length against leg
+  // angle (B) for the run in the animation, with an optional perturbed start
+  // at the same energy, as plotting/plotPhasePortraits.m.
+  var PHASES = ['flightDown', 'stance', 'flightUp'];
+  var PHASE_WIDTH = [2, 3, 1.3];
+
+  function legAngleOf(x) { return Math.atan2(x[1] - x[5], x[4] - x[0]) / DEG; }
+  function legLengthOf(x) { return Math.hypot(x[0] - x[4], x[1] - x[5]); }
+
+  function portraitTrace(run, y0) {
+    var tr = run.trace;
+    var T = { y: [], vy: [], a: [], L: [], phase: tr.phase, apexY: [y0], resets: [] };
+    tr.x.forEach(function (x) { T.y.push(x[1]); T.vy.push(x[3]); T.a.push(legAngleOf(x)); T.L.push(legLengthOf(x)); });
+    tr.events.forEach(function (e) {
+      if (e.guard === 'apex') {
+        T.apexY.push(e.xAfter[1]);
+        T.resets.push([legAngleOf(e.x), legAngleOf(e.xAfter)]);
+      }
+    });
+    return T;
+  }
+
+  // One series per phase. Descending flight and stance also take the first
+  // point of the next phase, so the loop closes at touchdown and takeoff;
+  // ascending flight ends at apex, where the leg reset is a jump.
+  function phaseSeries(X, Y, phase, widths, C) {
+    return PHASES.map(function (ph, k) {
+      var xs = [], ys = [];
+      for (var i = 0; i < X.length; i++) {
+        var on = phase[i] === ph || (ph !== 'flightUp' && i > 0 && phase[i - 1] === ph && phase[i] !== ph);
+        xs.push(on ? X[i] : null);
+        ys.push(on ? Y[i] : null);
+      }
+      return { x: xs, y: ys, color: C.series[k], width: widths[k] };
+    });
+  }
+
+  function perturbedRun() {
+    var P = S.portrait, p = S.p, a = S.apex;
+    var key = JSON.stringify([p, a, P.dy, P.n]);
+    if (P.key === key) return P.run;
+    var E = p.m * p.g * a.y + 0.5 * p.m * a.vx * a.vx;
+    var y1 = a.y + P.dy;
+    var vx2 = 2 * (E / p.m - p.g * y1);
+    P.key = key;
+    if (!(vx2 > 0)) { P.run = null; P.failed = 'energy'; return null; }
+    P.failed = '';
+    P.run = SlipSim.simulateStrides(p, { y: y1, vx: Math.sqrt(vx2) }, P.n, { trace: true, traceDt: 1e-3 });
+    return P.run;
+  }
+
+  function renderPortraits() {
+    if (!S.run) return;
+    var C = Plot.colors();
+    var G = portraitTrace(S.run, S.apex.y);
+    var P = S.portrait;
+    var pert = P.on ? perturbedRun() : null;
+    var R = pert ? portraitTrace(pert, S.apex.y + P.dy) : null;
+    var thin = [0.6, 0.6, 0.6];
+
+    // Panel A: body height against vertical velocity
+    var seriesA = [];
+    if (R) seriesA = seriesA.concat(phaseSeries(R.vy, R.y, R.phase, thin, C));
+    seriesA = seriesA.concat(phaseSeries(G.vy, G.y, G.phase, PHASE_WIDTH, C));
+    seriesA.push({ x: G.apexY.map(function () { return 0; }), y: G.apexY, points: true, color: C.series[1], radius: 4.5 });
+    var labelsA = [];
+    if (R) {
+      seriesA.push({ x: R.apexY.map(function () { return 0; }), y: R.apexY, points: true, color: C.series[2], radius: 3.5 });
+      // Even-numbered apex points to the right of the section line and odd
+      // ones to the left, fanned out so close points stay readable.
+      R.apexY.forEach(function (y, i) {
+        var right = i % 2 === 0, step = 8 + 10 * Math.floor(i / 2);
+        labelsA.push({ x: 0, y: y, text: String(i), dx: right ? step : -step, align: right ? 'left' : 'right', color: C.text });
+      });
+    }
+    var outA = Plot.render($('portraitA'), {
+      panelHeight: 300,
+      alt: 'Phase portrait A: body height against vertical velocity for the run in the animation' + (R ? ', with a perturbed start drawn thin.' : '.'),
+      panels: [{ xLabel: 'Vertical velocity (m/s)', yLabel: 'Body height (m)', title: 'A. Body height and vertical velocity',
+        refs: [{ x: 0, label: 'apex section' }], series: seriesA, labels: labelsA }]
+    });
+
+    // Panel B: leg length against leg angle from the ground
+    var seriesB = [];
+    if (R) seriesB = seriesB.concat(phaseSeries(R.a, R.L, R.phase, thin, C));
+    seriesB = seriesB.concat(phaseSeries(G.a, G.L, G.phase, PHASE_WIDTH, C));
+    var rx = [], ry = [];
+    G.resets.forEach(function (r) { rx.push(r[0], r[1], null); ry.push(S.p.L0, S.p.L0, null); });
+    if (rx.length) seriesB.push({ x: rx, y: ry, dotted: true });
+    var labelsB = G.resets.length ? [{ x: 0.5 * (G.resets[0][0] + G.resets[0][1]), y: S.p.L0, text: 'apex reset', align: 'center', dx: 0, dy: -9, color: C.grey }] : [];
+    var outB = Plot.render($('portraitB'), {
+      panelHeight: 300,
+      alt: 'Phase portrait B: leg length against leg angle from the ground for the run in the animation' + (R ? ', with a perturbed start drawn thin.' : '.'),
+      panels: [{ xLabel: 'Leg angle from ground (deg)', yLabel: 'Leg length (m)', title: 'B. Leg angle and leg length',
+        series: seriesB, labels: labelsB }]
+    });
+    P.tA = outA.transforms[0];
+    P.tB = outB.transforms[0];
+
+    $('pertFollow').disabled = !P.on;
+    portraitCaption(G, R, pert);
+    // The animation follows the perturbed start when asked to.
+    if (S.tab === 'stride') {
+      var want = P.on && P.follow === 'perturbed' && pert ? pert : S.run;
+      if (!S.anim.source || S.anim.source.runRef !== want) setAnimSource(slipSource(want), undefined);
+    }
+    drawPortraitDots();
+  }
+
+  function portraitCaption(G, R, pert) {
+    var P = S.portrait;
+    var n = S.run.apexSeq.length - 1;
+    var t = 'A: body height against vertical velocity for the ' + n + ' strides in the animation. One stride of a periodic gait traces a closed loop, and the apex, where vertical velocity crosses zero in flight (dotted line), is the section of the apex return map. ' +
+      'B: leg length against leg angle from the ground, as in the stride phase plots of Blum et al. (2011). Flight runs at rest length while the leg retracts, stance dips as the leg compresses and sweeps rearward, and the dotted line marks the leg reset at apex.';
+    if (!S.periodic) t += ' The current apex state is not periodic, so successive strides trace different loops.';
+    if (P.on) {
+      var sign = P.dy >= 0 ? '+' : '';
+      if (!pert) {
+        t += ' The perturbed start (apex height ' + sign + fmt(P.dy * 100, 1) + ' cm) needs more energy than the current gait has; choose a smaller apex height change.';
+      } else {
+        var done = pert.apexSeq.length - 1;
+        t += ' The perturbed start (apex height ' + sign + fmt(P.dy * 100, 1) + ' cm at the same energy, thin lines, apex points numbered) ' +
+          (pert.reason === 'cycleLimit' ? 'completed all ' + done + ' strides.' : 'stopped after ' + done + ' completed strides: ' + reasonText(pert.reason) + '.');
+        var dev = pert.apexSeq.map(function (a) { return a.y - S.apex.y; });
+        if (dev.length >= 3) {
+          var alt = true;
+          for (var i = 1; i < dev.length; i++) if (Math.sign(dev[i]) === Math.sign(dev[i - 1])) alt = false;
+          var ratio = Math.abs(dev[dev.length - 1]) / Math.abs(dev[0]);
+          t += ' Its apex heights ' + (alt ? 'alternate above and below' : 'do not alternate around') + ' the ' + (S.periodic ? 'periodic apex' : 'starting apex height') +
+            ', and the deviation ' + (ratio < 1 ? 'shrinks' : 'grows') + ' to ' + fmt(ratio, 2) + ' times its starting size after ' + (dev.length - 1) +
+            ' strides. The Return map tab gives lambda, the factor per stride.';
+        }
+      }
+    }
+    $('portraitCaption').textContent = t;
+  }
+
+  // Overlay canvases matched to the portrait canvases.
+  function overlayCtx(base, over) {
+    var dpr = window.devicePixelRatio || 1;
+    var w = base.clientWidth, h = base.clientHeight;
+    if (over.width !== Math.round(w * dpr) || over.height !== Math.round(h * dpr)) {
+      over.width = Math.round(w * dpr);
+      over.height = Math.round(h * dpr);
+      over.style.height = h + 'px';
+    }
+    var ctx = over.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    return ctx;
+  }
+
+  // One orange dot per portrait at the state of the current animation frame.
+  function drawPortraitDots() {
+    var P = S.portrait, src = S.anim.source;
+    if (S.model !== 'slip' || S.tab !== 'stride' || !P.tA || !src || src.kind !== 'slip' || !src.t.length) return;
+    var x = src.x[indexAt(src.t, S.anim.t)];
+    var C = Plot.colors();
+    [[ $('portraitA'), $('portraitADot'), P.tA, x[3], x[1] ], [ $('portraitB'), $('portraitBDot'), P.tB, legAngleOf(x), legLengthOf(x) ]].forEach(function (d) {
+      var ctx = overlayCtx(d[0], d[1]);
+      var T = d[2], X = T.sx(d[3]), Y = T.sy(d[4]);
+      if (X < T.plot.x - 2 || X > T.plot.x + T.plot.w + 2 || Y < T.plot.y - 2 || Y > T.plot.y + T.plot.h + 2) return;
+      ctx.fillStyle = C.series[4];
+      ctx.strokeStyle = C.ink;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(X, Y, 6, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+    });
   }
 
   /* ----- Return map tab ----- */
@@ -1990,6 +2166,31 @@
     $('familyRule').addEventListener('change', syncFamilyRule);
     syncFamilyRule();
     $('nmdBtn').addEventListener('click', computeNmd);
+
+    // Phase portraits: perturbed start
+    var rerenderPortraits = debounce(function () { if (S.tab === 'stride') renderPortraits(); }, 120);
+    $('pertOn').addEventListener('change', function () {
+      S.portrait.on = $('pertOn').checked;
+      if (!S.portrait.on) S.portrait.follow = 'gait', $('pertFollow').value = 'gait';
+      rerenderPortraits();
+    });
+    var setDy = function (v) {
+      v = clamp(isFinite(v) ? v : 2, -3, 3);
+      $('pertDy').value = v; $('pertDyNum').value = v;
+      S.portrait.dy = v / 100;
+      rerenderPortraits();
+    };
+    $('pertDy').addEventListener('input', function () { setDy(parseFloat($('pertDy').value)); });
+    $('pertDyNum').addEventListener('change', function () { setDy(parseFloat($('pertDyNum').value)); });
+    $('pertN').addEventListener('change', function () {
+      S.portrait.n = clamp(Math.round(parseFloat($('pertN').value) || 6), 1, 10);
+      $('pertN').value = S.portrait.n;
+      rerenderPortraits();
+    });
+    $('pertFollow').addEventListener('change', function () {
+      S.portrait.follow = $('pertFollow').value;
+      rerenderPortraits();
+    });
     $('retrRecompute').addEventListener('click', recomputeRetraction);
     $('retrRestore').addEventListener('click', function () { S.retr = null; renderRetraction(); });
     $('familyRecompute').addEventListener('click', recomputeFamily);

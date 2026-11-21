@@ -23,7 +23,7 @@ Every example and lesson script begins with labeled blocks of user settings (par
 | `+hde/` | Engine: `simulate`, `phase`, `transition`, `checkModel`, `solverDefaults`, `newtonSolve`, `returnMapJacobian`, `floquetSummary`, `resultsFolder` |
 | `models/slip/` | Spring-loaded inverted pendulum (SLIP) runner: model, presets, return map, stride measures, gait solver, stability, stiffness family |
 | `models/ballInBox/`, `models/pendulum/` | Small teaching models: impacts, Zeno behavior, a single guard and reset |
-| `plotting/` | Figures in the lab teaching style (`daleyStyle.m`), stride plots, return-map cobwebs, animation |
+| `plotting/` | Figures in the lab teaching style (`daleyStyle.m`), stride plots, phase portraits with a moving dot and a perturbed start, return-map cobwebs, animation |
 | `examples/` | `ex01` to `ex08`: short scripts, one idea each |
 | `livescripts/` | Lessons 1 to 8 as MATLAB live scripts in plain-text format (R2025a or later opens them in the Live Editor; earlier releases run them as scripts) |
 | `tests/` | `runAllTests.m` and the MATLAB test suite |
@@ -63,7 +63,7 @@ The simulated first-contact limit follows the actual flight path, including the 
 | Lesson | Topic | Web lab | MATLAB |
 |---|---|---|---|
 | 1 | Hybrid systems: flows, guards, resets, Zeno behavior | yes | `L1_hybridSystems.m` |
-| 2 | One running stride: forces and energy exchange | yes | `L2_runningStride.m` |
+| 2 | One running stride: forces, energy exchange and phase portraits | yes | `L2_runningStride.m` |
 | 3 | Initial conditions and contact conditions | yes | `L3_initialAndContactConditions.m` |
 | 4 | Periodic gaits and the return map | yes | `L4_returnMapStability.m` |
 | 5 | Same speed, different legs: peak force, leg work, stability | yes | `L5_sameSpeedDifferentLegs.m` |

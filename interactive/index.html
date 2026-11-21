@@ -87,6 +87,38 @@
         </div>
 
         <div role="tabpanel" id="panel-stride" aria-labelledby="tab-stride" class="tabpanel">
+          <h3>Phase portraits</h3>
+          <div class="portraits">
+            <div class="portrait-wrap">
+              <canvas id="portraitA" class="plot"></canvas>
+              <canvas id="portraitADot" class="plot-overlay" aria-hidden="true"></canvas>
+            </div>
+            <div class="portrait-wrap">
+              <canvas id="portraitB" class="plot"></canvas>
+              <canvas id="portraitBDot" class="plot-overlay" aria-hidden="true"></canvas>
+            </div>
+          </div>
+          <ul class="phase-key" aria-label="Line key">
+            <li><svg width="30" height="10" aria-hidden="true"><line x1="0" y1="5" x2="30" y2="5" class="pk-down"/></svg> descending flight</li>
+            <li><svg width="30" height="10" aria-hidden="true"><line x1="0" y1="5" x2="30" y2="5" class="pk-stance"/></svg> stance</li>
+            <li><svg width="30" height="10" aria-hidden="true"><line x1="0" y1="5" x2="30" y2="5" class="pk-up"/></svg> ascending flight</li>
+            <li><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5" class="pk-dot"/></svg> current frame of the animation</li>
+          </ul>
+          <div class="inline-controls">
+            <label class="check"><input type="checkbox" id="pertOn"> Show a perturbed start</label>
+            <label for="pertDy">Apex height change at the same energy (cm)</label>
+            <input type="range" id="pertDy" min="-3" max="3" step="0.1" value="2">
+            <input type="number" id="pertDyNum" min="-3" max="3" step="0.1" value="2" aria-label="Apex height change at the same energy in cm">
+            <label for="pertN">Strides</label>
+            <input type="number" id="pertN" min="1" max="10" step="1" value="6">
+            <label for="pertFollow">Dot and animation follow</label>
+            <select id="pertFollow" disabled>
+              <option value="gait">current gait</option>
+              <option value="perturbed">perturbed start</option>
+            </select>
+          </div>
+          <p id="portraitCaption" class="small"></p>
+          <h3>Forces and energy</h3>
           <p class="small">First stride from the current apex state. Stance is shaded.</p>
           <div id="strideMessage" class="message" hidden></div>
           <canvas id="strideCanvas" class="plot"></canvas>

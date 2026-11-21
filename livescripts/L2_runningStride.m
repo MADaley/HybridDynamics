@@ -22,8 +22,17 @@ fprintf('Peak vertical force %.2f body weights; leg compression %.1f %% of leg l
 %[text] The body trades kinetic energy and gravitational potential energy with elastic energy in the spring. The model has no damping and no actuation, so the total mechanical energy is constant.
 plotSlipStride(M, p, "Baseline gait");
 fprintf('Mechanical energy change over the stride: %.1e J\n', M.energyChange);
+%[text] ## 4. Phase portraits
+%[text] A phase portrait plots one state against another as the stride unfolds. Panel A shows body height against vertical velocity. One stride of a periodic gait is a closed loop: descending flight, stance, then ascending flight back to the apex, where the vertical velocity is zero. Panel B shows leg angle against leg length, the format Blum et al. (2011) used for the strides of running humans and pheasants. In flight the leg stays at rest length while it retracts; in stance it shortens and sweeps from front to back; at apex it is reset to its starting angle, a jump drawn as a dotted line.
+%[text] The overlay starts 2 cm higher with the same mechanical energy. Its apex points sit on the dotted line in panel A and are numbered by stride. Watch whether they approach the periodic loop and whether they alternate above and below it: that is the return map of Lesson 4, read on the phase portrait.
+perturbation = 0.02;        % change in apex height for the overlay (m); 0 for none
+showAnimation = false;      % true: a dot moves along both portraits with the runner
+plotPhasePortraits(p, apex, struct('perturbation', perturbation, 'perturbStrides', 6, ...
+    'animate', showAnimation, 'animateRun', "perturbed"));
 %[text] ## Try this
 %[text] Change `p.k` to 20000 and rerun: the stride is no longer periodic (see Lesson 4). Compare the peak force and contact time.
+%[text] Set `showAnimation = true` to move a dot along both portraits in step with the runner.
+%[text] Compare the overlay for the presets `"humanLowStiffness"` and `"humanHighStiffness"`.
 %[text] Call `animateSlip(M, p)` to watch the stride.
 
 %[appendix]{"version":"1.0"}

@@ -15,7 +15,10 @@
  * Panel
  *   xLabel, yLabel, title, xLim [a, b], yLim [a, b], square (bool)
  *   series : [{x, y, label, style (0-3), points (bool), color (CSS)}]
- *   refs   : [{y: v} | {x: v} | {identity: true}]
+ *   refs   : [{y: v} | {x: v} | {identity: true}], optional label (written at
+ *            the top of a vertical line or the right end of a horizontal one)
+ *   series.dotted : true draws a thin dotted grey annotation line (for
+ *            example a reset), never a data series
  *   shade  : [{x0, x1, label}]  light grey spans; label is written at the top
  *   labels : [{x, y, text, color, dx, dy, align}]  text placed beside a point
  *   whiskers : [{x, y, lo, hi, label}]  a point with thin vertical whiskers
@@ -192,11 +195,26 @@ var Plot = (function () {
       ctx.stroke();
     });
     ctx.setLineDash([]);
+    var refLabels = (panel.refs || []).filter(function (r) { return r.label; });
 
     // Series: lines, then markers
     (panel.series || []).forEach(function (s, k) {
       var st = s.style === undefined ? k : s.style;
       var col = s.color || C.series[st % C.series.length];
+      if (s.dotted) {
+        ctx.save();
+        ctx.strokeStyle = C.grey;
+        ctx.lineWidth = s.width || 1;
+        ctx.setLineDash([2, 3]);
+        ctx.beginPath();
+        for (var q = 0; q < s.x.length; q++) {
+          if (q === 0 || s.x[q] === null || s.x[q - 1] === null) ctx.moveTo(sx(s.x[q]), sy(s.y[q]));
+          else ctx.lineTo(sx(s.x[q]), sy(s.y[q]));
+        }
+        ctx.stroke();
+        ctx.restore();
+        return;
+      }
       if (!s.points || s.line) {
         ctx.strokeStyle = col;
         ctx.lineWidth = s.width || WIDTHS[st % 4];
@@ -240,6 +258,19 @@ var Plot = (function () {
 
     // Whiskers and direct labels are drawn outside the clip so that text
     // near an edge stays readable.
+    refLabels.forEach(function (r) {
+      ctx.fillStyle = C.grey;
+      ctx.font = '11px ' + font;
+      if (r.x !== undefined) {
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        haloText(ctx, r.label, sx(r.x) + 4, plot.y + 2, C);
+      } else if (r.y !== undefined) {
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'bottom';
+        haloText(ctx, r.label, plot.x + plot.w, sy(r.y) - 2, C);
+      }
+    });
     // Data points with thin vertical whiskers (for example mean +/- SD)
     (panel.whiskers || []).forEach(function (w) {
       ctx.strokeStyle = C.ink;
@@ -319,6 +350,7 @@ var Plot = (function () {
     }
     if (panel.legend) drawLegend(ctx, panel, plot, C, font);
     ctx.restore();
+    return { sx: sx, sy: sy, plot: plot, xLim: xl, yLim: yl };
   }
 
   // Text with a thin outline in the panel color, so labels stay legible over lines.
@@ -442,14 +474,16 @@ var Plot = (function () {
         reserve = Math.max(reserve, legendWidth(prep.ctx, panel, fontFamily()));
       });
     }
-    spec.panels.forEach(function (panel, i) {
+    var transforms = spec.panels.map(function (panel, i) {
       var r = Math.floor(i / cols), c = i % cols;
-      drawPanel(prep.ctx, { x: c * cw, y: r * ph, w: cw, h: ph }, panel, C, reserve);
+      return drawPanel(prep.ctx, { x: c * cw, y: r * ph, w: cw, h: ph }, panel, C, reserve);
     });
     if (spec.alt) {
       canvas.setAttribute('role', 'img');
       canvas.setAttribute('aria-label', spec.alt);
     }
+    // Axis transforms, so a caller can draw on an overlay canvas in data units.
+    return { transforms: transforms, w: prep.w, h: prep.h };
   }
 
   return { render: render, colors: colors, WIDTHS: WIDTHS, RADII: RADII, extent: extent, prepare: prepare };

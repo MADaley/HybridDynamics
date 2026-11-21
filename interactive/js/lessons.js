@@ -92,12 +92,15 @@ var HDS_LESSONS = {
           'The spring-mass model represents a runner as a point mass on a massless spring leg (Blickhan 1989; McMahon and Cheng 1990). A stride has three phases: descending flight from the apex, stance with the foot pinned to the ground, and ascending flight back to the next apex.',
           'During stance the spring compresses and stores elastic energy while the body slows and drops; the spring then extends and returns that energy. The model has no damping and no actuation, so the total mechanical energy stays constant. The energy panel in the Stride tab tracks each component and the total.',
           'The baseline runner has a mass of ' + f(h.m, 0) + ' kg, a leg length of ' + f(h.L0, 2) + ' m and a leg stiffness of ' + f(h.k / 1000, 0) + ' kN/m, a relative stiffness k L0 / (m g) of ' + f(h.k * h.L0 / (h.m * h.g), 1) + '. It runs at an average speed of ' + f(h.meanSpeed, 1) + ' m/s with ' + f(h.stepFrequency, 1) + ' steps per second.',
-          'Forces appear in body weights. Over a periodic stride the average vertical force equals one body weight, so a short contact needs a high peak force.'
+          'Forces appear in body weights. Over a periodic stride the average vertical force equals one body weight, so a short contact needs a high peak force.',
+          'The Stride tab also draws two phase portraits of the run in the animation. In panel A, body height against vertical velocity, one stride of a periodic gait traces a closed loop, and the apex is the point where the loop crosses zero vertical velocity in flight, the section of the return map in lesson 4 (apex height ' + f(h.apexHeight, 3) + ' m for the baseline). In panel B, leg length against leg angle from the ground, as in the stride phase plots of Blum et al. (2011), flight runs at the rest length of ' + f(h.L0, 2) + ' m while the leg retracts, stance dips as the leg compresses and sweeps rearward, and the reset of the leg at apex appears as a jump, drawn as a dotted line. An orange dot on both portraits follows the animation.'
         ],
         tasks: [
           'Open the Stride tab and find the time of the peak vertical force. Where is the leg at that time?',
           'Increase the leg stiffness and watch the contact time and the peak force.',
-          'Compare the kinetic and elastic energy traces during stance.'
+          'Compare the kinetic and elastic energy traces during stance.',
+          'Turn on Show a perturbed start in the Stride tab, set Dot and animation follow to perturbed start, and step through the run with Next event.',
+          'Load the low-stiffness and the high-stiffness presets in turn and compare their loops in both portraits.'
         ],
         question: 'Kinetic energy falls during the first half of stance. Why does the total mechanical energy stay constant?',
         answer: 'The kinetic and gravitational energy lost in early stance is stored in the spring as elastic energy and returned in late stance. With no damping and no actuation, the leg does equal amounts of negative and positive work.'

@@ -209,6 +209,18 @@ main:focus { outline: none; }
 progress { width: 160px; }
 .prose p { max-width: 75ch; }
 
+/* ===== Phase portraits ===== */
+.portraits { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 760px) { .portraits { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.portrait-wrap { position: relative; min-width: 0; }
+.plot-overlay { position: absolute; left: 0; top: 0; width: 100%; pointer-events: none; }
+.phase-key { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 0; margin: 6px 0; font-size: 0.88rem; color: var(--muted); }
+.phase-key li { display: inline-flex; align-items: center; gap: 6px; }
+.pk-down { stroke: var(--s1); stroke-width: 2; }
+.pk-stance { stroke: var(--s2); stroke-width: 3; }
+.pk-up { stroke: var(--s3); stroke-width: 1.3; }
+.pk-dot { fill: var(--s5); stroke: var(--ink); stroke-width: 1.5; }
+
 /* ===== Tables ===== */
 .table-wrap { overflow-x: auto; max-width: 100%; }
 .data-table { border-collapse: collapse; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
