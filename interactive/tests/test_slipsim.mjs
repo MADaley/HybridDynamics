@@ -19,6 +19,8 @@ function check(label, ok, detail) {
   if (ok) { passed++; } else { failed++; console.log('FAIL  ' + label + (detail ? '  ' + detail : '')); }
 }
 function close(label, a, b, tol, rel) {
+  // MATLAB writes Inf as null in JSON.
+  if (b === null && a === Infinity) { check(label, true); return; }
   const err = Math.abs(a - b);
   const lim = rel ? tol * Math.max(Math.abs(b), 1e-12) : tol;
   check(label, err <= lim, `js ${a}  matlab ${b}  diff ${err.toExponential(2)}`);
@@ -53,6 +55,10 @@ for (const c of asArray(ref.slip.cases)) {
     close(`${c.name}: largest drop survived`, d.maxDrop, c.maxDrop, 1e-9);
     check(`${c.name}: drop failure mode`, d.dropFailure === String(c.dropFailure || '').replace('terminal:', ''),
       `js ${d.dropFailure} matlab ${c.dropFailure}`);
+    const D = Sim.normalizedMaxDrop(p, c.apex, { referenceRetractionDegPerS: c.nmd.referenceRetractionDegPerS });
+    close(`${c.name}: NMD estimate`, D.estimateNMD, c.nmd.estimate, 1e-6, true);
+    close(`${c.name}: NMD estimate at reference rate`, D.estimateDropAtReference / p.L0, c.nmd.atReference, 1e-6, true);
+    close(`${c.name}: NMD simulated`, D.simulatedNMD, c.nmd.simulated, 2e-4);
   }
 }
 
@@ -76,13 +82,17 @@ for (const c of asArray(ref.slip.cases)) {
     retractionDegPerS: pr.retractionDegPerS }, y: pr.apexHeight, vx: pr.apexSpeed };
   const kValues = rowsRef.map(r => r.k);
   const rows = await Sim.stiffnessFamily(base, kValues, fam.target,
-    { drop: false, footClearance: fam.footClearance });
+    { drop: false, footClearance: fam.footClearance,
+      referenceRetractionDegPerS: fam.referenceRetractionDegPerS });
   rows.forEach((r, i) => {
     check(`family k=${r.k}: solved`, r.ok);
     if (r.ok) {
       close(`family k=${r.k}: leg angle at apex`, r.legAngleDeg, rowsRef[i].legAngleDeg, 1e-6);
       close(`family k=${r.k}: retraction rate`, r.retractionDegPerS, rowsRef[i].retractionDegPerS, 1e-5);
       close(`family k=${r.k}: apex clearance`, r.apexClearance, rowsRef[i].apexClearance, 1e-9);
+      close(`family k=${r.k}: NMD estimate`, r.nmdEstimate, rowsRef[i].nmdEstimate, 1e-6, true);
+      close(`family k=${r.k}: NMD at reference rate`, r.nmdEstimateAtReference, rowsRef[i].nmdEstimateAtReference, 1e-6, true);
+      close(`family k=${r.k}: NMD simulated`, r.nmdSimulated, rowsRef[i].nmdSimulated, 2e-4);
       close(`family k=${r.k}: peak vertical force`, r.peakVerticalForceBW, rowsRef[i].peakVerticalForceBW, 1e-5, true);
       close(`family k=${r.k}: lambda`, r.lambda, rowsRef[i].lambda, 1e-4);
     }

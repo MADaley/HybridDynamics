@@ -35,13 +35,23 @@ Every example and lesson script begins with labeled blocks of user settings (par
 
 Three periodic gaits of an 80 kg runner with a 1 m leg share an average speed of 4 m/s and 3 steps per second; they differ in leg stiffness and therefore in touchdown angle. Each swing leg retracts (rotates rearward) from apex at the rate that holds the foot 5 cm above the ground at apex and still lands at the same angle and time. With a fixed leg angle the foot of these gaits sits only 0.6 to 3 cm above the ground at apex, and small changes in apex height end the run. Values come from `models/slip/slip_presets.csv`, written by `tools/slip_computePresets.m` (the foot clearance is a setting there).
 
-| Preset | Leg stiffness (kN/m) | Touchdown angle (deg) | Retraction (deg/s) | Contact time (s) | Peak vertical force (body weights) | Eigenvalue | Largest drop survived (m) |
+| Preset | Leg stiffness (kN/m) | Touchdown angle (deg) | Retraction (deg/s) | Contact time (s) | Peak vertical force (body weights) | Eigenvalue | Largest drop survived, 20 strides (m) |
 |---|---|---|---|---|---|---|---|
 | `humanLowStiffness` | 8 | 58.52 | 130.4 | 0.264 | 2.05 | -0.994 | 0.04 |
 | `human` (baseline) | 12 | 64.01 | 75.9 | 0.222 | 2.40 | -0.692 | 0.06 |
 | `humanHighStiffness` | 20 | 69.55 | 39.3 | 0.177 | 2.98 | -0.009 | 0.28 |
 
+Normalized maximum drop (NMD; Daley and Usherwood 2010), the largest unexpected drop, as a fraction of leg length, for which the leg still makes stance contact. NMD = (g/2) (Phi / omega)^2 / L, with Phi the stance half-angle and omega the retraction rate.
+
+| Preset | Stance half-angle (deg) | NMD estimate, own retraction | NMD estimate at 75.9 deg/s | Simulated first-contact limit |
+|---|---|---|---|---|
+| `humanLowStiffness` | 31.48 | 0.29 | 0.84 | 0.52 |
+| `human` (baseline) | 25.99 | 0.57 | 0.57 | 0.86 |
+| `humanHighStiffness` | 20.45 | 1.33 | 0.36 | 1.79 |
+
 The baseline relative leg stiffness, k L0 / (m g) = 15.3, lies near the value of 15 that McMahon and Cheng (1990) used for human running. The eigenvalue is the slope of the apex-height return map at constant energy: magnitudes below 1 mean that a small error shrinks from stride to stride, and a negative value means the error changes sign each stride. The drop test lowers the ground once and counts a gait as surviving when it completes 20 further strides.
+
+Real animals can recover from a drop through muscle work and damping in the strides that follow, provided the leg makes contact in the stance right after the drop; NMD measures that first-contact limit, and the 20-stride test measures recovery with no muscle work at all. At one common retraction rate, compliant legs have the largest NMD, as Daley and Usherwood (2010) predicted; with retraction set by foot clearance, compliant legs retract fastest and the order reverses. The simulated first-contact limit follows the actual flight path, including the downward speed at the usual touchdown and the rise of the hip as the leg rotates toward vertical, which the kinematic estimate leaves out.
 
 Retraction trades foot clearance against stability. The compliant gait lands soonest after apex, so the same 5 cm clearance needs the fastest retraction, which places it near the stability limit of -1. After a large drop, the longer fall lets a retracting leg rotate further and land steeper, and the next apex undershoots by more than the foot clearance; in this model that is how all three presets fail the drop test.
 

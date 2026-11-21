@@ -68,6 +68,7 @@
     fall: 'the body reached the ground',
     reversal: 'forward speed reached zero',
     footBelowGround: 'the apex fell below the height needed to place the leg (foot below the ground at apex)',
+    missedStance: 'the leg touched down with the body moving away from the foot and could not be loaded (missed stance)',
     timeLimit: 'no touchdown within 5 s',
     stepTooSmall: 'the integrator step became too small'
   };
@@ -78,6 +79,23 @@
     var key = String(r).replace('terminal:', '');
     return REASONS[key] || key;
   }
+
+  /* ----- Normalized maximum drop (Daley and Usherwood 2010) -----
+     NMD = dHmax / L with dHmax = (g / 2) (Phi / omega)^2, where Phi is the
+     stance half-angle (90 deg minus the touchdown angle) and omega the leg
+     retraction rate. JSON null stands for an infinite value. */
+  var REF_RETRACTION = REF.slip.family.referenceRetractionDegPerS;
+  function nmdEstimate(p, touchdownAngleDeg, retractionDegPerS) {
+    var phi = (90 - touchdownAngleDeg) * DEG, om = retractionDegPerS * DEG;
+    if (!(om > 0)) return Infinity;
+    if (!(phi > 0)) return 0;
+    return 0.5 * p.g * Math.pow(phi / om, 2) / p.L0;
+  }
+  function nmdText(v, kind, d) {
+    if (v === null || v === undefined || v === Infinity) return kind === 'simulated' ? '> 5' : 'no limit';
+    return fmt(v, d === undefined ? 3 : d);
+  }
+  function finiteOrNaN(v) { return v === null || v === undefined || !isFinite(v) ? NaN : Number(v); }
 
   /* ===================== Application state ===================== */
   var init = presetState('human');
@@ -95,6 +113,7 @@
     lambda: NaN,
     cobwebStart: 0.01,
     clearance: REF.slip.family.footClearance,
+    nmd: null,
     family: { rows: MATLAB_FAMILY, source: 'matlab' },
     perturb: { drop: 0.05, strides: 15, run: null, compare: null },
     grid: { result: null, stale: false, busy: false },
@@ -381,6 +400,7 @@
     var M = SlipSim.metrics(S.p, S.apex, 2e-4);
     S.run = run;
     S.M = M;
+    S.nmd = null;
     var first = run.apexSeq[1];
     S.periodic = !!first && Math.abs(first.y - S.apex.y) < 1e-6 && Math.abs(first.vx - S.apex.vx) < 1e-6;
     S.lambda = M.ok ? SlipSim.lambda(S.p, S.apex) : NaN;
@@ -829,14 +849,45 @@
       ['Peak elastic energy', M.peakElasticEnergy, 1, 'J'],
       ['Positive leg work per distance', M.positiveWorkPerDistance, 3, 'J/(kg m)'],
       ['Force-time cost index (1/contact time)', M.forceTimeCostIndex, 3, '1/s'],
-      ['Energy change over the stride', M.energyChange, 2, 'J (check, ideally 0)']
+      ['Energy change over the stride', M.energyChange, 2, 'J (check, ideally 0)'],
+      ['Stance half-angle (90 deg minus touchdown angle)', 90 - M.touchdownAngleDeg, 2, 'deg'],
+      ['NMD estimate at the current retraction rate', 'NMD', 3, 'fraction of leg length']
     ];
     var html = '<thead><tr><th scope="col">Measure</th><th scope="col">Value</th><th scope="col">Units</th></tr></thead><tbody>';
     rows.forEach(function (r) {
-      var v = r[0] === 'Energy change over the stride' ? Number(r[1]).toExponential(r[2]) : fmt(r[1], r[2]);
+      var v = r[0] === 'Energy change over the stride' ? Number(r[1]).toExponential(r[2]) :
+        (r[1] === 'NMD' ? nmdText(nmdEstimate(S.p, M.touchdownAngleDeg, S.p.retractionDegPerS), 'estimate') : fmt(r[1], r[2]));
       html += '<tr><td>' + r[0] + '</td><td>' + v + '</td><td>' + r[3] + '</td></tr>';
     });
     table.innerHTML = html + '</tbody>';
+    renderNmdResult();
+  }
+
+  function renderNmdResult() {
+    var out = $('nmdResult');
+    var R = S.nmd;
+    if (!R) {
+      out.textContent = 'The simulated first-contact limit follows the ballistic path after drops of increasing height and finds the largest drop whose first touchdown loads the leg. It takes about a tenth of a second.';
+      return;
+    }
+    out.textContent = 'Simulated first-contact limit: ' + nmdText(R.simulatedNMD, 'simulated') + ' leg lengths. Estimate at the current retraction rate: ' +
+      nmdText(R.estimateNMD, 'estimate') + '; at the baseline rate of ' + fmt(REF_RETRACTION, 1) + ' deg/s: ' +
+      nmdText(R.estimateDropAtReference / S.p.L0, 'estimate') + '. The simulated value follows the actual ballistic path, so it includes the downward speed at touchdown and the change in hip height, which the estimate leaves out.';
+  }
+
+  function computeNmd() {
+    var btn = $('nmdBtn');
+    btn.disabled = true;
+    setTimeout(function () {
+      try {
+        S.nmd = SlipSim.normalizedMaxDrop(S.p, S.apex, { referenceRetractionDegPerS: REF_RETRACTION });
+        renderNmdResult();
+        updateStatus($('nmdResult').textContent, true);
+      } catch (e) {
+        updateStatus('The first-contact limit could not be computed: ' + e.message, true);
+      }
+      btn.disabled = false;
+    }, 20);
   }
 
   /* ----- Return map tab ----- */
@@ -1034,6 +1085,8 @@
         (st.hasDrop ? ' and largest drop survived.' : '.')
     });
 
+    renderFamilyNmd(rows, st);
+
     var clearance = S.family.source === 'matlab' ? REF.slip.family.footClearance : S.family.footClearance;
     var src = S.family.source === 'matlab' ? 'computed in MATLAB (tools/exportWebReference.m)' : 'computed in this browser for the current body';
     $('familyIntro').textContent = 'Every gait in this family is periodic at an average speed of ' + fmt(st.speed, 2) +
@@ -1057,7 +1110,7 @@
         ' kN/m (drops tested up to 50 cm). ' + (st.dropModes.length ? 'Failure mode at the first drop not survived: ' +
           st.dropModes.map(reasonText).join('; ') + '.' : 'No gait failed within the tested drops.'));
     }
-    parts.push('Daley and Usherwood (2010) proposed the normalized maximum drop, a kinematic measure, which predicts that compliant legs negotiate relatively larger drops. The drop test here holds the leg control fixed and counts strides to failure, so the two measures address different questions.');
+    nmdParagraphs(rows).forEach(function (x) { parts.push(x); });
     var ft = $('familyText');
     ft.innerHTML = '';
     parts.forEach(function (x) { ft.appendChild(el('p', null, x)); });
@@ -1074,6 +1127,7 @@
       ['Leg angle at apex (deg)', function (g) { return fmt(g.pr.legAngleDeg, 2); }],
       ['Retraction rate (deg/s)', function (g) { return fmt(g.pr.retractionDegPerS, 1); }],
       ['Touchdown angle (deg)', function (g) { return fmt(g.pr.touchdownAngleDeg, 2); }],
+      ['Stance half-angle Phi (deg)', function (g) { return fmt(g.pr.stanceHalfAngleDeg, 2); }],
       ['Foot clearance at apex (cm)', function (g) { return fmt(g.pr.apexClearance * 100, 1); }],
       ['Contact time (s)', function (g) { return fmt(g.r.contactTime, 3); }],
       ['Duty factor', function (g) { return fmt(g.r.dutyFactor, 3); }],
@@ -1082,12 +1136,20 @@
       ['Positive leg work (J/(kg m))', function (g) { return fmt(g.r.positiveWorkPerDistance, 3); }],
       ['Force-time cost index (1/s)', function (g) { return fmt(g.r.forceTimeCostIndex, 2); }],
       ['Eigenvalue lambda', function (g) { return fmt(g.pr.lambda, 3); }],
-      ['Largest drop survived (cm)', function (g) { return fmt(g.pr.maxDrop * 100, 0); }],
-      ['Failure at the first drop not survived', function (g) { return reasonText(g.pr.dropFailure); }, 'wrap']
+      ['group', 'Unexpected drop (fraction of leg length)'],
+      ['Largest drop survived for 20 strides', function (g) { return fmt(g.pr.maxDrop / g.pr.L0, 2); }],
+      ['NMD estimate at own retraction rate', function (g) { return nmdText(g.pr.nmdEstimate, 'estimate', 2); }],
+      ['NMD estimate at the baseline rate (' + fmt(REF_RETRACTION, 1) + ' deg/s)', function (g) { return nmdText(g.pr.nmdEstimateAtReference, 'estimate', 2); }],
+      ['Simulated first-contact limit', function (g) { return nmdText(g.pr.nmdSimulated, 'simulated', 2); }],
+      ['Failure at the first 20-stride drop not survived', function (g) { return reasonText(g.pr.dropFailure); }, 'wrap']
     ];
     var html = '<caption>Values from the MATLAB family. Load sets the sidebar to that gait.</caption><thead><tr><th scope="col">Measure</th>' +
       gaits.map(function (g) { return '<th scope="col">' + g.pr.label + '</th>'; }).join('') + '</tr></thead><tbody>';
     measures.forEach(function (m) {
+      if (m[0] === 'group') {
+        html += '<tr class="group"><th scope="colgroup" colspan="' + (gaits.length + 1) + '">' + m[1] + '</th></tr>';
+        return;
+      }
       html += '<tr' + (m[2] ? ' class="' + m[2] + '"' : '') + '><th scope="row">' + m[0] + '</th>' +
         gaits.map(function (g) { return '<td>' + m[1](g) + '</td>'; }).join('') + '</tr>';
     });
@@ -1103,6 +1165,83 @@
         updateStatus('Loaded ' + preset(b.getAttribute('data-preset')).label + '.');
       });
     });
+  }
+
+  // NMD against stiffness: three series, clipped at 3 leg lengths.
+  function renderFamilyNmd(rows, st) {
+    var NMD_TOP = 3;
+    var kk = rows.map(function (r) { return r.k / 1000; });
+    var col = function (f) { return rows.map(function (r) { return finiteOrNaN(r[f]); }); };
+    var own = col('nmdEstimate'), atRef = col('nmdEstimateAtReference'), sim = col('nmdSimulated');
+    var refRate = S.family.source === 'matlab' ? REF_RETRACTION : REF_RETRACTION;
+    Plot.render($('familyNmdCanvas'), {
+      panelHeight: 250,
+      alt: 'Normalized maximum drop against leg stiffness: the estimate at each gait\'s own retraction rate, the estimate at a common retraction rate of ' +
+        fmt(refRate, 1) + ' deg/s, and the simulated first-contact limit.',
+      panels: [{
+        xLabel: 'Leg stiffness (kN/m)', yLabel: 'NMD (fraction of leg length)', yLim: [0, NMD_TOP], legend: 'outside',
+        series: [
+          { x: kk, y: own, style: 0, label: 'estimate, own retraction rate' },
+          { x: kk, y: atRef, style: 1, label: 'estimate, ' + fmt(refRate, 1) + ' deg/s' },
+          { x: kk, y: sim, style: 2, label: 'simulated first contact' }
+        ]
+      }]
+    });
+    var above = function (arr) { return kk.filter(function (k, i) { return arr[i] > NMD_TOP; }); };
+    var notFinite = function (v) { return v === null || v === undefined || v === Infinity; };
+    var noLimitOwn = rows.filter(function (r) { return notFinite(r.nmdEstimate); }).length;
+    var beyondSim = rows.filter(function (r) { return notFinite(r.nmdSimulated); }).map(function (r) { return r.k / 1000; });
+    var note = 'The axis stops at ' + NMD_TOP + ' leg lengths.';
+    var a1 = above(own), a2 = above(sim);
+    if (a1.length) note += ' The own-rate estimate exceeds it from ' + fmt(a1[0], 0) + ' kN/m.';
+    if (a2.length) note += ' The simulated limit exceeds it from ' + fmt(a2[0], 0) + ' kN/m.';
+    if (beyondSim.length) note += ' From ' + fmt(beyondSim[0], 0) + ' kN/m the simulated limit lies beyond the 5 m search and is left out.';
+    if (noLimitOwn) note += ' Gaits with a fixed leg angle have no estimate limit and are left out.';
+    $('familyNmdNote').textContent = note;
+  }
+
+  function orderText(list, field, d) {
+    return list.map(function (g) { return g.label + ' (' + nmdText(g[field], field === 'nmdSimulated' ? 'simulated' : 'estimate', d) + ')'; }).join(' to ');
+  }
+
+  // Explanation of NMD, computed from the preset and family rows.
+  function nmdParagraphs(rows) {
+    var out = [];
+    out.push('Real animals do not behave as a perfect conservative spring-mass system. After an unexpected drop they have time to recover with non-conservative dynamics, such as muscle work and damping, provided the leg makes contact and takes load in the stance right after the drop. The normalized maximum drop of Daley and Usherwood (2010) measures that first-contact limit: NMD = dHmax / L, with dHmax = (g / 2) (Phi / omega)^2, where Phi is the stance half-angle (90 deg minus the touchdown angle), omega the leg retraction rate and L the leg length. For a larger drop the leg rotates past vertical before the foot reaches the ground and misses stance. NMD therefore complements the 20-stride drop test, in which the conservative model cannot remove the energy a drop adds.');
+    var P = PRESETS.map(function (pr) {
+      return { label: pr.label, k: pr.k, rate: pr.retractionDegPerS, nmdEstimate: finiteOrNaN(pr.nmdEstimate),
+        nmdEstimateAtReference: finiteOrNaN(pr.nmdEstimateAtReference), nmdSimulated: finiteOrNaN(pr.nmdSimulated) };
+    });
+    var by = function (f) { return P.filter(function (g) { return isFinite(g[f]); }).sort(function (a, b) { return a[f] - b[f]; }); };
+    var own = by('nmdEstimate'), atRef = by('nmdEstimateAtReference'), sim = by('nmdSimulated');
+    var compliant = P.reduce(function (a, b) { return b.k < a.k ? b : a; });
+    var fastest = P.reduce(function (a, b) { return b.rate > a.rate ? b : a; });
+    var t = 'At each preset\'s own retraction rate the NMD estimate rises from ' + orderText(own, 'nmdEstimate', 2) + '.';
+    if (own.length && own[0].label === fastest.label) {
+      t += ' Retraction set for ' + fmt(REF.slip.family.footClearance * 100, 0) + ' cm of foot clearance is fastest for the ' + fastest.label.toLowerCase() +
+        ' gait (' + fmt(fastest.rate, 0) + ' deg/s), so its leg reaches vertical soonest and its own-rate NMD is the smallest.';
+    }
+    t += ' At one common retraction rate of ' + fmt(REF_RETRACTION, 1) + ' deg/s the estimate rises from ' + orderText(atRef, 'nmdEstimateAtReference', 2) + '.';
+    if (atRef.length && atRef[atRef.length - 1].label === compliant.label) {
+      t += ' At a common rate the most compliant leg, with the widest stance half-angle, has the largest NMD, the outcome Daley and Usherwood (2010) predicted.';
+    }
+    out.push(t);
+    var ratios = P.filter(function (g) { return isFinite(g.nmdSimulated) && isFinite(g.nmdEstimate) && g.nmdEstimate > 0; })
+      .map(function (g) { return g.nmdSimulated / g.nmdEstimate; });
+    var t2 = 'The simulated first-contact limit follows the actual ballistic path and rises from ' + orderText(sim, 'nmdSimulated', 2) + '.';
+    if (ratios.length && ratios.every(function (r) { return r > 1; })) {
+      t2 += ' It exceeds the own-rate estimate in every preset, by a factor of ' + fmt(Math.min.apply(null, ratios), 2) + ' to ' + fmt(Math.max.apply(null, ratios), 2) +
+        ', because it includes the downward speed of the body at touchdown and the change in hip height, which the estimate leaves out.';
+    }
+    var first = rows[0], last = rows[rows.length - 1];
+    if (first && last && isFinite(finiteOrNaN(first.nmdEstimateAtReference))) {
+      t2 += ' Across the family, the estimate at the common rate ' + (finiteOrNaN(last.nmdEstimateAtReference) > finiteOrNaN(first.nmdEstimateAtReference) ? 'rises' : 'falls') +
+        ' from ' + nmdText(first.nmdEstimateAtReference, 'estimate', 2) + ' at ' + fmt(first.k / 1000, 0) + ' kN/m to ' +
+        nmdText(last.nmdEstimateAtReference, 'estimate', 2) + ' at ' + fmt(last.k / 1000, 0) + ' kN/m.';
+    }
+    out.push(t2);
+    out.push('The two drop measures answer different questions. The 20-stride drop test asks whether the conservative model keeps running after the drop with no way to remove the added energy; NMD asks whether the first stance after the drop begins with a loaded leg, the condition for an animal to recover with muscle work and damping.');
+    return out;
   }
 
   async function recomputeFamily() {
@@ -1131,6 +1270,7 @@
       rows = await SlipSim.stiffnessFamily({ p: g.p, y: g.y, vx: g.vx }, kValues, target, {
         drop: $('familyDrop').checked,
         footClearance: clearance,
+        referenceRetractionDegPerS: REF_RETRACTION,
         onProgress: function (f) { prog.value = f; }
       });
     } catch (e) {
@@ -1396,6 +1536,7 @@
       fam: st,
       f: fmt,
       clearance: REF.slip.family.footClearance,
+      referenceRate: REF_RETRACTION,
       fixedClearance: function (n) {
         var pr = preset(n);
         return pr.apexHeight - pr.L0 * Math.sin(pr.touchdownAngleDeg * DEG);
@@ -1564,6 +1705,7 @@
 
     // Family
     $('familyClearance').value = REF.slip.family.footClearance;
+    $('nmdBtn').addEventListener('click', computeNmd);
     $('familyRecompute').addEventListener('click', recomputeFamily);
     $('familyRestore').addEventListener('click', function () {
       S.family = { rows: MATLAB_FAMILY, source: 'matlab' };

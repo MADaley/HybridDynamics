@@ -91,6 +91,10 @@
           <canvas id="strideCanvas" class="plot"></canvas>
           <h3>Stride measures</h3>
           <div class="table-wrap"><table id="measuresTable" class="data-table"></table></div>
+          <div class="inline-controls">
+            <button type="button" id="nmdBtn" class="btn btn-quiet">Compute simulated first-contact limit</button>
+          </div>
+          <p id="nmdResult" class="small"></p>
         </div>
 
         <div role="tabpanel" id="panel-returnMap" aria-labelledby="tab-returnMap" class="tabpanel" hidden>
@@ -109,6 +113,9 @@
         <div role="tabpanel" id="panel-family" aria-labelledby="tab-family" class="tabpanel" hidden>
           <p id="familyIntro"></p>
           <canvas id="familyCanvas" class="plot"></canvas>
+          <h3>Normalized maximum drop</h3>
+          <canvas id="familyNmdCanvas" class="plot"></canvas>
+          <p id="familyNmdNote" class="small"></p>
           <div id="familyText" class="prose"></div>
           <h3>Three gaits at the same speed</h3>
           <div class="table-wrap"><table id="familyTable" class="data-table"></table></div>

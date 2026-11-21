@@ -13,6 +13,7 @@
  *   R.fallTime(name)        time from apex to touchdown (s)
  *   R.fixedLambda(name)     eigenvalue with a fixed leg angle
  *   R.drop(name), R.fixedDrop(name)  {maxDrop, first: {height, strides, failure}}
+ *   R.referenceRate         common retraction rate for the NMD comparison (deg/s)
  *
  * Each lesson: id, title, model ('slip' | 'ball'), preset, settings
  * (overrides of slip parameters), tab, goal, body (paragraphs), tasks,
@@ -31,6 +32,13 @@ var HDS_LESSONS = {
     var dropLimit = F.dropMaxValue >= 0.5 - 1e-9 ?
       'reaches the 50 cm limit of the test, first at ' + f(F.kDropMax, 0) + ' kN/m' :
       'reaches ' + f(F.dropMaxValue * 100, 0) + ' cm at ' + f(F.kDropMax, 0) + ' kN/m';
+    var refRate = R.referenceRate;
+    var nmd = function (v) { return v === null || v === undefined || v === Infinity ? 'no limit' : f(v, 2); };
+    var inc = function (a, b, c) { return a < b && b < c; };
+    var ownRises = inc(lo.nmdEstimate, h.nmdEstimate, hi.nmdEstimate);
+    var refFalls = inc(hi.nmdEstimateAtReference, h.nmdEstimateAtReference, lo.nmdEstimateAtReference);
+    var simAbove = [lo, h, hi].every(function (g) { return g.nmdSimulated === null || g.nmdSimulated > g.nmdEstimate; });
+    var farAbove = [lo, h, hi].every(function (g) { return g.nmdSimulated === null || g.nmdSimulated > 2 * g.maxDrop; });
     var signText = F.crossings.length ? 'lambda is negative below about ' + f(F.crossings[0].k, 0) + ' kN/m, where errors change sign from stride to stride, and positive above it' :
       (F.lambdaMax < 0 ? 'lambda is negative for every gait, so errors change sign from stride to stride' : 'lambda is positive for every gait');
 
@@ -130,7 +138,7 @@ var HDS_LESSONS = {
           'The model does no net work over a stride, so any energy cost needs a proxy. The positive leg work per distance is the mechanical work by the legs if the spring returned no energy; it falls with stiffness, since a stiff leg stores less elastic energy. The force-time cost index, the inverse of contact time, follows the force-time hypothesis of Kram and Taylor (1990); it rises with stiffness. The two proxies rank the gaits in opposite order.',
           'Every gait in the family uses swing-leg retraction where needed to keep the foot ' + f(R.clearance * 100, 0) + ' cm above the ground at apex (lesson 6). Retraction leaves each gait unchanged, so the forces and timing match the same gaits with a fixed leg angle; it changes only the stability.',
           'Stability has two aspects here. The eigenvalue lambda measures how fast a small error decays; the drop test measures the largest unexpected drop in the ground that the gait survives for 20 strides. In this family ' + signText + '. lambda is most negative (' + f(F.lambdaMin, 2) + ') at ' + f(F.kLambdaMin, 0) + ' kN/m' + edge(F.lambdaMin) + ', and |lambda| is smallest near ' + f(F.kBest, 0) + ' kN/m. The largest drop survived ' + dropLimit + ', against ' + f(lo.maxDrop * 100, 0) + ' cm for the low-stiffness preset.',
-          'Daley and Usherwood (2010) proposed the normalized maximum drop, a kinematic measure, which predicts that compliant legs negotiate relatively larger drops. The drop test on this page holds the leg control fixed and counts strides to failure. The two measures address different questions about stability.'
+          'Daley and Usherwood (2010) proposed a second drop measure, the normalized maximum drop (NMD): the largest drop, in leg lengths, for which the leg still reaches the ground before rotating past vertical, so the first stance after the drop can take load (lesson 7). At one common retraction rate of ' + f(refRate, 1) + ' deg/s, the NMD estimate is ' + nmd(lo.nmdEstimateAtReference) + ' for the low-stiffness preset and ' + nmd(hi.nmdEstimateAtReference) + ' for the high-stiffness preset. The 20-stride drop test and NMD address different questions about stability, and the comparison table lists both.'
         ],
         tasks: [
           'Load the three presets in turn and compare contact time, peak force, retraction rate and lambda.',
@@ -172,10 +180,19 @@ var HDS_LESSONS = {
           'A drop in the ground during flight lets the body fall farther before touchdown. In the model, the apex height above the new ground rises by the drop height at the same forward speed, which adds m g h of mechanical energy, and the model has no damping to remove it.',
           'With swing-leg retraction, the longer fall after a drop gives the leg more time to rotate, so it lands at a steeper angle, and the next apex undershoots. For each preset the smallest drop that ends the run within 20 strides (' + f(R.drop('humanLowStiffness').first.height * 100, 0) + ', ' + f(R.drop('human').first.height * 100, 0) + ' and ' + f(R.drop('humanHighStiffness').first.height * 100, 0) + ' cm for the low-stiffness, baseline and high-stiffness presets) completes ' + (R.drop('human').first.strides === 1 ? 'one stride' : f(R.drop('human').first.strides, 0) + ' strides') + ' after the drop; the apex at the end of that stride falls below the height needed to place the leg. The run ends through overcorrection on the first stride after the drop, even though each unperturbed stride starts with the foot ' + f(R.clearance * 100, 0) + ' cm above the ground.',
           'With a fixed leg angle, the same gaits survive drops of ' + f(R.fixedDrop('humanLowStiffness').maxDrop * 100, 0) + ', ' + f(R.fixedDrop('human').maxDrop * 100, 0) + ' and ' + f(R.fixedDrop('humanHighStiffness').maxDrop * 100, 0) + ' cm, and the first drop not survived ends the run ' + f(R.fixedDrop('humanLowStiffness').first.strides, 0) + ', ' + f(R.fixedDrop('human').first.strides, 0) + ' and ' + f(R.fixedDrop('humanHighStiffness').first.strides, 0) + ' strides after the drop, as the error builds over several strides.',
-          'The Perturbation tab applies one drop after the first stride, plots apex height and speed stride by stride, and reports the stride at which a run stops.'
+          'Real animals do not behave as a perfect conservative spring-mass system. After an unexpected drop they have time to recover with non-conservative dynamics, such as muscle work and damping, provided the leg makes contact and takes load in the stance right after the drop. The normalized maximum drop of Daley and Usherwood (2010) measures that first-contact limit: NMD = dHmax / L, with dHmax = (g / 2) (Phi / omega)^2, where Phi is the stance half-angle (90 deg minus the touchdown angle) and omega the leg retraction rate. For a larger drop the leg rotates past vertical before the foot reaches the ground and misses stance.',
+          'At their own retraction rates, the NMD estimate is ' + nmd(lo.nmdEstimate) + ', ' + nmd(h.nmdEstimate) + ' and ' + nmd(hi.nmdEstimate) + ' leg lengths for the low-stiffness, baseline and high-stiffness presets' +
+            (ownRises ? ': the compliant leg retracts fastest to keep its foot clearance and reaches vertical soonest, so its NMD is the smallest.' : '.') +
+            ' At one common rate of ' + f(refRate, 1) + ' deg/s the values are ' + nmd(lo.nmdEstimateAtReference) + ', ' + nmd(h.nmdEstimateAtReference) + ' and ' + nmd(hi.nmdEstimateAtReference) +
+            (refFalls ? ': the order reverses, because the compliant leg lands with the widest stance half-angle, the outcome Daley and Usherwood (2010) predicted.' : '.') +
+            ' The simulated first-contact limit is ' + nmd(lo.nmdSimulated) + ', ' + nmd(h.nmdSimulated) + ' and ' + nmd(hi.nmdSimulated) +
+            (simAbove ? '; it exceeds the estimate because it includes the downward speed at touchdown and the change in hip height.' : '.'),
+          'The largest drops survived for 20 strides are ' + f(lo.maxDrop, 2) + ', ' + f(h.maxDrop, 2) + ' and ' + f(hi.maxDrop, 2) + ' leg lengths' + (farAbove ? ', far below these first-contact limits' : '') + '. The 20-stride test asks whether the conservative model, with no way to remove the added energy, keeps running; NMD asks whether the first stance after the drop begins with a loaded leg, the condition for an animal to recover with muscle work.',
+          'The Perturbation tab applies one drop after the first stride, plots apex height and speed stride by stride, and reports the stride at which a run stops. The Stride tab computes the NMD estimate and the simulated first-contact limit for the current settings.'
         ],
         tasks: [
           'Set the drop to 5 cm and press Compare the three presets.',
+          'In the Stride tab, press Compute simulated first-contact limit for the baseline preset, then for the low-stiffness preset.',
           'Find the smallest drop that stops the baseline gait and read the stride at which it stops.',
           'Press Fixed leg angle in the sidebar and repeat the same drop.'
         ],

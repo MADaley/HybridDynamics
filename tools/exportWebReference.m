@@ -51,6 +51,10 @@ q = p; q.k = 3000;
 cases{end+1} = slipCase("leg too compliant", q, apex, false, 1);
 q = p; q.legAngleDeg = 40;
 cases{end+1} = slipCase("leg too shallow", q, apex, false, 1);
+% Touchdown with the leg behind vertical and the body moving away: missed stance.
+q = struct('m', 80, 'k', 12000, 'L0', 1, 'g', 9.81, 'legAngleDeg', 100, 'retractionDegPerS', 0);
+cases{end+1} = slipCase("leg behind vertical, missed stance", q, ...
+    struct('y', sind(100) + 0.01, 'vx', 5), false, 1);
 ref.slip.cases = [cases{:}];
 
 %% 3. Same-speed stiffness family (with the drop test)
@@ -60,6 +64,7 @@ T = slip_stiffnessFamily(struct('p', p, 'y', apex.y, 'vx', apex.vx), kValues, ..
     target, struct('terrain', true, 'footClearance', footClearance));
 ref.slip.family.target = target;
 ref.slip.family.footClearance = footClearance;
+ref.slip.family.referenceRetractionDegPerS = p.retractionDegPerS;
 
 %% 3b. Retraction for a foot clearance (reference for the web function)
 q = p; q.legAngleDeg = presets.touchdownAngleDeg(presets.name == "human"); q.retractionDegPerS = 0;
@@ -117,6 +122,7 @@ c.metrics = [];
 c.lambda = [];
 c.maxDrop = [];
 c.dropFailure = "";
+c.nmd = [];
 if periodic
     M = slip_metrics(p, [apex.y; apex.vx]);
     keep = ["period" "contactTime" "flightTime" "stepLength" "meanSpeed" ...
@@ -130,6 +136,9 @@ if periodic
     c.lambda = S.lambda;
     c.maxDrop = S.maxDrop;
     c.dropFailure = S.dropFailure;
+    D = slip_normalizedMaxDrop(p, apex, struct('referenceRetractionDegPerS', 100));
+    c.nmd = struct('estimate', D.estimateNMD, 'simulated', D.simulatedNMD, ...
+        'atReference', D.estimateDropAtReference / p.L0, 'referenceRetractionDegPerS', 100);
 end
 end
 

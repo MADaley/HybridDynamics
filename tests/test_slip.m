@@ -134,6 +134,32 @@ verifyNotEmpty(testCase, S.dropFailure);
 verifyTrue(testCase, startsWith(S.dropFailure, "terminal:"));
 end
 
+function testNormalizedMaxDrop(testCase)
+% Daley and Usherwood (2010): dHmax = g/2 * (Phi/omega)^2. The simulated
+% value (first contact at or in front of vertical) has the closed form
+% L0 + g/2 * tv^2 - y, with tv the time from apex for the leg to reach vertical.
+[p, a] = slip_defaults("human");
+D = slip_normalizedMaxDrop(p, a, struct('referenceRetractionDegPerS', 100));
+M = slip_metrics(p, [a.y; a.vx]);
+phi = deg2rad(90 - M.touchdownAngleDeg);
+verifyEqual(testCase, D.estimateDrop, 0.5 * p.g * (phi / deg2rad(p.retractionDegPerS))^2, 'RelTol', 1e-6);
+verifyEqual(testCase, D.estimateDropAtReference, 0.5 * p.g * (phi / deg2rad(100))^2, 'RelTol', 1e-6);
+tv = (90 - p.legAngleDeg) / p.retractionDegPerS;
+verifyEqual(testCase, D.simulatedDrop, p.L0 + 0.5 * p.g * tv^2 - a.y, 'AbsTol', 2e-4);
+q = p; q.retractionDegPerS = 0; q.legAngleDeg = M.touchdownAngleDeg;
+Dfixed = slip_normalizedMaxDrop(q, a);
+verifyEqual(testCase, Dfixed.estimateDrop, Inf);
+end
+
+function testMissedStance(testCase)
+% Touchdown with the leg behind vertical and the body moving away from the
+% foot: the leg cannot be loaded, and the run ends as a missed stance.
+p = struct('m', 80, 'k', 12000, 'L0', 1, 'g', 9.81, 'legAngleDeg', 100, 'retractionDegPerS', 0);
+[sNext, info] = slip_returnMap(p, [sind(100) + 0.01; 5]);
+verifyTrue(testCase, all(isnan(sNext)));
+verifyEqual(testCase, info.exitReason, "terminal:missedStance");
+end
+
 function testStrideFailureIsReported(testCase)
 % A leg angle steeper than the apex allows puts the foot below ground.
 p = testCase.TestData.p; a = testCase.TestData.apex;

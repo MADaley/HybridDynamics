@@ -96,7 +96,12 @@ var HDS_REFERENCE = {
         "maxDrop": 0.06,
         "dropFailure": "terminal:footBelowGround",
         "peakVerticalForceBW": 2.40073180091957,
-        "contactTime": 0.221918656974245
+        "contactTime": 0.221918656974245,
+        "stanceHalfAngleDeg": 25.9934375121073,
+        "nmdEstimate": 0.574699272353317,
+        "nmdSimulated": 0.862890625,
+        "nmdEstimateAtReference": 0.574699272353317,
+        "referenceRetractionDegPerS": 75.9386546807528
       },
       {
         "name": "humanLowStiffness",
@@ -117,7 +122,12 @@ var HDS_REFERENCE = {
         "maxDrop": 0.04,
         "dropFailure": "terminal:footBelowGround",
         "peakVerticalForceBW": 2.04535148801347,
-        "contactTime": 0.26364342472531
+        "contactTime": 0.26364342472531,
+        "stanceHalfAngleDeg": 31.4791563647289,
+        "nmdEstimate": 0.285894700367009,
+        "nmdSimulated": 0.51552734375,
+        "nmdEstimateAtReference": 0.842867645919625,
+        "referenceRetractionDegPerS": 75.9386546807528
       },
       {
         "name": "humanHighStiffness",
@@ -138,7 +148,12 @@ var HDS_REFERENCE = {
         "maxDrop": 0.28,
         "dropFailure": "terminal:footBelowGround",
         "peakVerticalForceBW": 2.9813542020067,
-        "contactTime": 0.177078156037725
+        "contactTime": 0.177078156037725,
+        "stanceHalfAngleDeg": 20.4462510175466,
+        "nmdEstimate": 1.32714382297879,
+        "nmdSimulated": 1.78876953125,
+        "nmdEstimateAtReference": 0.355582673062283,
+        "referenceRetractionDegPerS": 75.9386546807528
       }
     ],
     "cases": [
@@ -203,7 +218,13 @@ var HDS_REFERENCE = {
         },
         "lambda": -0.69172120196747677,
         "maxDrop": 0.060000000000000005,
-        "dropFailure": "terminal:footBelowGround"
+        "dropFailure": "terminal:footBelowGround",
+        "nmd": {
+          "estimate": 0.57469927235331841,
+          "simulated": 0.862890625,
+          "atReference": 0.33141063830780504,
+          "referenceRetractionDegPerS": 100
+        }
       },
       {
         "name": "preset humanLowStiffness",
@@ -266,7 +287,13 @@ var HDS_REFERENCE = {
         },
         "lambda": -0.994378459890366,
         "maxDrop": 0.04,
-        "dropFailure": "terminal:footBelowGround"
+        "dropFailure": "terminal:footBelowGround",
+        "nmd": {
+          "estimate": 0.28589470036700915,
+          "simulated": 0.51552734375,
+          "atReference": 0.48605473850589287,
+          "referenceRetractionDegPerS": 100
+        }
       },
       {
         "name": "preset humanHighStiffness",
@@ -329,7 +356,13 @@ var HDS_REFERENCE = {
         },
         "lambda": -0.0093311757953795649,
         "maxDrop": 0.28,
-        "dropFailure": "terminal:footBelowGround"
+        "dropFailure": "terminal:footBelowGround",
+        "nmd": {
+          "estimate": 1.327143822978788,
+          "simulated": 1.7887695312499998,
+          "atReference": 0.205053123119872,
+          "referenceRetractionDegPerS": 100
+        }
       },
       {
         "name": "human, apex +2 cm",
@@ -392,7 +425,8 @@ var HDS_REFERENCE = {
         "metrics": [],
         "lambda": [],
         "maxDrop": [],
-        "dropFailure": ""
+        "dropFailure": "",
+        "nmd": []
       },
       {
         "name": "human, retraction 60 deg/s",
@@ -447,7 +481,8 @@ var HDS_REFERENCE = {
         "metrics": [],
         "lambda": [],
         "maxDrop": [],
-        "dropFailure": ""
+        "dropFailure": "",
+        "nmd": []
       },
       {
         "name": "fast retraction, foot dips below ground",
@@ -502,7 +537,8 @@ var HDS_REFERENCE = {
         "metrics": [],
         "lambda": [],
         "maxDrop": [],
-        "dropFailure": ""
+        "dropFailure": "",
+        "nmd": []
       },
       {
         "name": "human, fixed leg angle",
@@ -565,7 +601,13 @@ var HDS_REFERENCE = {
         },
         "lambda": 0.39437091790717194,
         "maxDrop": 0.14,
-        "dropFailure": "terminal:footBelowGround"
+        "dropFailure": "terminal:footBelowGround",
+        "nmd": {
+          "estimate": null,
+          "simulated": null,
+          "atReference": 0.33141063830780332,
+          "referenceRetractionDegPerS": 100
+        }
       },
       {
         "name": "leg too steep for the apex",
@@ -596,7 +638,8 @@ var HDS_REFERENCE = {
         "metrics": [],
         "lambda": [],
         "maxDrop": [],
-        "dropFailure": ""
+        "dropFailure": "",
+        "nmd": []
       },
       {
         "name": "leg too compliant",
@@ -643,7 +686,8 @@ var HDS_REFERENCE = {
         "metrics": [],
         "lambda": [],
         "maxDrop": [],
-        "dropFailure": ""
+        "dropFailure": "",
+        "nmd": []
       },
       {
         "name": "leg too shallow",
@@ -690,7 +734,46 @@ var HDS_REFERENCE = {
         "metrics": [],
         "lambda": [],
         "maxDrop": [],
-        "dropFailure": ""
+        "dropFailure": "",
+        "nmd": []
+      },
+      {
+        "name": "leg behind vertical, missed stance",
+        "p": {
+          "m": 80,
+          "k": 12000,
+          "L0": 1,
+          "g": 9.81,
+          "legAngleDeg": 100,
+          "retractionDegPerS": 0
+        },
+        "apex": {
+          "y": 0.994807753012208,
+          "vx": 5
+        },
+        "firstStride": {
+          "exitReason": "terminal:missedStance",
+          "events": [
+            {
+              "time": 0.045152364098573324,
+              "guard": "touchdown"
+            },
+            {
+              "time": 0.045152364098573324,
+              "guard": "missedStance"
+            }
+          ]
+        },
+        "exitReason": "terminal:missedStance",
+        "apexSequence": {
+          "y": 0.994807753012208,
+          "vx": 5
+        },
+        "metrics": [],
+        "lambda": [],
+        "maxDrop": [],
+        "dropFailure": "",
+        "nmd": []
       }
     ],
     "family": {
@@ -700,6 +783,7 @@ var HDS_REFERENCE = {
         "stepFrequency": 3.00000000000361
       },
       "footClearance": 0.05,
+      "referenceRetractionDegPerS": 75.9386546807528,
       "rows": [
         {
           "k": 6000,
@@ -727,7 +811,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": -0.894601545863849,
           "maxDrop": 0.05,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 36.108491057674613,
+          "nmdEstimate": 0.10922770232169658,
+          "nmdSimulated": 0.3283203125,
+          "nmdEstimateAtReference": 1.1090008877950903
         },
         {
           "k": 7000,
@@ -755,7 +843,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": -0.99055575241313587,
           "maxDrop": 0.05,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 33.542390011032218,
+          "nmdEstimate": 0.20116513503641445,
+          "nmdSimulated": 0.42207031250000004,
+          "nmdEstimateAtReference": 0.95697638835644416
         },
         {
           "k": 8000,
@@ -783,7 +875,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": -0.9943784589167004,
           "maxDrop": 0.04,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 31.479156364831276,
+          "nmdEstimate": 0.28589470039138964,
+          "nmdSimulated": 0.51552734375,
+          "nmdEstimateAtReference": 0.842867645925105
         },
         {
           "k": 9000,
@@ -811,7 +907,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.049999999999999933,
           "lambda": -0.9472284854361579,
           "maxDrop": 0.05,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 29.771161576479358,
+          "nmdEstimate": 0.36335762318504855,
+          "nmdSimulated": 0.6052734375,
+          "nmdEstimateAtReference": 0.75388442899316555
         },
         {
           "k": 10000,
@@ -839,7 +939,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": -0.87293495644125141,
           "maxDrop": 0.05,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 28.325618791253476,
+          "nmdEstimate": 0.43578577438025212,
+          "nmdSimulated": 0.69189453125000011,
+          "nmdEstimateAtReference": 0.68245186657015089
         },
         {
           "k": 11000,
@@ -867,7 +971,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": -0.78516401991968188,
           "maxDrop": 0.05,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 27.0807243770166,
+          "nmdEstimate": 0.50553483803991506,
+          "nmdSimulated": 0.77714843750000018,
+          "nmdEstimateAtReference": 0.62378333481677073
         },
         {
           "k": 12000,
@@ -895,7 +1003,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": -0.69172120267135817,
           "maxDrop": 0.060000000000000005,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 25.993437512107405,
+          "nmdEstimate": 0.57469927235321017,
+          "nmdSimulated": 0.862890625,
+          "nmdEstimateAtReference": 0.57469927235331963
         },
         {
           "k": 13000,
@@ -923,7 +1035,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": -0.59703836372049235,
           "maxDrop": 0.069999999999999993,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 25.032704033585091,
+          "nmdEstimate": 0.64513113534736111,
+          "nmdSimulated": 0.95068359375000011,
+          "nmdEstimateAtReference": 0.53300188270762461
         },
         {
           "k": 14000,
@@ -951,7 +1067,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": -0.50359231763053014,
           "maxDrop": 0.08,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 24.175461410746536,
+          "nmdEstimate": 0.71854132861248077,
+          "nmdSimulated": 1.0424804687500004,
+          "nmdEstimateAtReference": 0.49712174143415139
         },
         {
           "k": 15000,
@@ -979,7 +1099,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.049999999999999933,
           "lambda": -0.41271554924227072,
           "maxDrop": 0.09,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 23.404164773581485,
+          "nmdEstimate": 0.79660891495019137,
+          "nmdSimulated": 1.1398437500000003,
+          "nmdEstimateAtReference": 0.46590729213787352
         },
         {
           "k": 16000,
@@ -1007,7 +1131,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": -0.32507067258269462,
           "maxDrop": 0.11,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 22.705191813127129,
+          "nmdEstimate": 0.88108682656589965,
+          "nmdSimulated": 1.2448242187500003,
+          "nmdEstimateAtReference": 0.43849390802566712
         },
         {
           "k": 17000,
@@ -1035,7 +1163,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": -0.24092998613334249,
           "maxDrop": 0.13,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 22.067778905376869,
+          "nmdEstimate": 0.97390875324865644,
+          "nmdSimulated": 1.35947265625,
+          "nmdEstimateAtReference": 0.41421942560613484
         },
         {
           "k": 18000,
@@ -1063,7 +1195,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.049999999999999933,
           "lambda": -0.16033094709932971,
           "maxDrop": 0.17,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 21.483290839622455,
+          "nmdEstimate": 1.0773070046297089,
+          "nmdSimulated": 1.4862304687500005,
+          "nmdEstimateAtReference": 0.39256794058560507
         },
         {
           "k": 19000,
@@ -1091,7 +1227,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000155,
           "lambda": -0.08318583870570162,
           "maxDrop": 0.21000000000000002,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 20.944706853313761,
+          "nmdEstimate": 1.1939539642303758,
+          "nmdSimulated": 1.628125,
+          "nmdEstimateAtReference": 0.37313139027806835
         },
         {
           "k": 20000,
@@ -1119,7 +1259,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": -0.00933117235035752,
           "maxDrop": 0.28,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 20.446251017576614,
+          "nmdEstimate": 1.3271438229876766,
+          "nmdSimulated": 1.7887695312499998,
+          "nmdEstimateAtReference": 0.35558267306332708
         },
         {
           "k": 21000,
@@ -1147,7 +1291,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": 0.061429236242749319,
           "maxDrop": 0.38,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 19.983121268696109,
+          "nmdEstimate": 1.481037996514651,
+          "nmdSimulated": 1.97275390625,
+          "nmdEstimateAtReference": 0.33965644645731469
         },
         {
           "k": 22000,
@@ -1175,7 +1323,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": 0.12930866917004735,
           "maxDrop": 0.5,
-          "dropFailure": ""
+          "dropFailure": "",
+          "stanceHalfAngleDeg": 19.551287368892403,
+          "nmdEstimate": 1.6610092709459099,
+          "nmdSimulated": 2.18583984375,
+          "nmdEstimateAtReference": 0.32513515664629161
         },
         {
           "k": 23000,
@@ -1203,7 +1355,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": 0.19451877767528991,
           "maxDrop": 0.5,
-          "dropFailure": ""
+          "dropFailure": "",
+          "stanceHalfAngleDeg": 19.147337934720966,
+          "nmdEstimate": 1.874139504831047,
+          "nmdSimulated": 2.4359375,
+          "nmdEstimateAtReference": 0.31183870508730743
         },
         {
           "k": 24000,
@@ -1231,7 +1387,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": 0.25726848354001852,
           "maxDrop": 0.44,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 18.76836302322954,
+          "nmdEstimate": 2.129960020145417,
+          "nmdSimulated": 2.7333984375,
+          "nmdEstimateAtReference": 0.29961669146884246
         },
         {
           "k": 25000,
@@ -1259,7 +1419,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000155,
           "lambda": 0.31775724907145975,
           "maxDrop": 0.42,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 18.411862935375325,
+          "nmdEstimate": 2.4415848158716251,
+          "nmdSimulated": 3.09228515625,
+          "nmdEstimateAtReference": 0.28834251366335428
         },
         {
           "k": 26000,
@@ -1287,7 +1451,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": 0.37616806267681824,
           "maxDrop": 0.45,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 18.075676511008595,
+          "nmdEstimate": 2.827498107548343,
+          "nmdSimulated": 3.5325195312499997,
+          "nmdEstimateAtReference": 0.27790882283874135
         },
         {
           "k": 27000,
@@ -1315,7 +1483,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": 0.43267847515404689,
           "maxDrop": 0.5,
-          "dropFailure": ""
+          "dropFailure": "",
+          "stanceHalfAngleDeg": 17.757924189188529,
+          "nmdEstimate": 3.3144707229456603,
+          "nmdSimulated": 4.0828124999999993,
+          "nmdEstimateAtReference": 0.2682239840407778
         },
         {
           "k": 28000,
@@ -1343,7 +1515,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.049999999999999933,
           "lambda": 0.48745427842777911,
           "maxDrop": 0.5,
-          "dropFailure": ""
+          "dropFailure": "",
+          "stanceHalfAngleDeg": 17.456962433472597,
+          "nmdEstimate": 3.9425049905670866,
+          "nmdSimulated": 4.7857421874999995,
+          "nmdEstimateAtReference": 0.25920929355602462
         },
         {
           "k": 29000,
@@ -1371,7 +1547,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": 0.54064113935936575,
           "maxDrop": 0.5,
-          "dropFailure": ""
+          "dropFailure": "",
+          "stanceHalfAngleDeg": 17.171346795964581,
+          "nmdEstimate": 4.7736019271693193,
+          "nmdSimulated": null,
+          "nmdEstimateAtReference": 0.25079676633849035
         },
         {
           "k": 30000,
@@ -1399,7 +1579,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": 0.59237455805050132,
           "maxDrop": 0.5,
-          "dropFailure": ""
+          "dropFailure": "",
+          "stanceHalfAngleDeg": 16.899801914366591,
+          "nmdEstimate": 5.9081531464522108,
+          "nmdSimulated": null,
+          "nmdEstimateAtReference": 0.24292736651992294
         },
         {
           "k": 31000,
@@ -1427,7 +1611,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": 0.64279363276353862,
           "maxDrop": 0.5,
-          "dropFailure": ""
+          "dropFailure": "",
+          "stanceHalfAngleDeg": 16.641196650452713,
+          "nmdEstimate": 7.5176128371191959,
+          "nmdSimulated": null,
+          "nmdEstimateAtReference": 0.23554957187980971
         },
         {
           "k": 32000,
@@ -1455,7 +1643,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": 0.69201762900150676,
           "maxDrop": 0.5,
-          "dropFailure": ""
+          "dropFailure": "",
+          "stanceHalfAngleDeg": 16.394524035154205,
+          "nmdEstimate": 9.9149937388122549,
+          "nmdSimulated": null,
+          "nmdEstimateAtReference": 0.22861822014844591
         },
         {
           "k": 33000,
@@ -1483,7 +1675,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": 0.74014869552052609,
           "maxDrop": 0.5,
-          "dropFailure": ""
+          "dropFailure": "",
+          "stanceHalfAngleDeg": 16.158883883329494,
+          "nmdEstimate": 13.723056383176363,
+          "nmdSimulated": null,
+          "nmdEstimateAtReference": 0.22209354388666175
         },
         {
           "k": 34000,
@@ -1511,7 +1707,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.050000000000000044,
           "lambda": 0.78730312676356107,
           "maxDrop": 0.5,
-          "dropFailure": ""
+          "dropFailure": "",
+          "stanceHalfAngleDeg": 15.933468856948451,
+          "nmdEstimate": 20.332667035085407,
+          "nmdSimulated": null,
+          "nmdEstimateAtReference": 0.21594039202122448
         },
         {
           "k": 35000,
@@ -1539,7 +1739,11 @@ var HDS_REFERENCE = {
           "apexClearance": 0.049999999999999933,
           "lambda": 0.83357519066296071,
           "maxDrop": 0.47,
-          "dropFailure": "terminal:footBelowGround"
+          "dropFailure": "terminal:footBelowGround",
+          "stanceHalfAngleDeg": 15.717552348515881,
+          "nmdEstimate": 33.406289257976177,
+          "nmdSimulated": null,
+          "nmdEstimateAtReference": 0.2101275731649353
         }
       ]
     },

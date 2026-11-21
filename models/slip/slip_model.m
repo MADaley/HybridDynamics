@@ -20,7 +20,12 @@ function model = slip_model(p)
 %                                            already below the ground (the
 %                                            apex is lower than the
 %                                            touchdown height): a stumble
-%     flightDown --touchdown--> stance       foot reaches the ground
+%     flightDown --touchdown--> stance       foot reaches the ground and the
+%                                            body moves toward the foot
+%                          --> noContact     foot reaches the ground while the
+%                                            body moves away from it: the leg
+%                                            cannot be loaded (missed stance)
+%     noContact  --missedStance--> END
 %     flightDown --fall-------> END          body reaches the ground
 %     stance     --takeoff----> flightUp     leg returns to rest length
 %     stance     --reversal---> END          forward speed reaches zero
@@ -62,6 +67,14 @@ flightDown = hde.phase("flightDown", @(t, s) flightFlow(s, g, omega), ...
     maxStep = flightMaxStep, ...
     description = "Ballistic descent from apex; the leg rotates at the retraction rate.");
 
+% The leg cannot be loaded when the body moves away from the foot at
+% touchdown (angle between leg and body velocity above 90 deg); this phase
+% ends the run at once (its guard is already past zero on entry).
+noContact = hde.phase("noContact", @(t, s) zeros(size(s)), ...
+    guards = "missedStance", ...
+    guardFcn = @(t, s) -1, ...
+    description = "Touchdown with the body moving away from the foot: the leg misses stance.");
+
 stance = hde.phase("stance", @(t, s) stanceFlow(s, m, k, L0, g), ...
     guards = ["takeoff", "reversal", "fall"], ...
     guardFcn = @(t, s) [L0 - hypot(s(1), s(2)); s(3); s(2)], ...
@@ -80,8 +93,10 @@ flightUp = hde.phase("flightUp", @(t, s) flightFlow(s, g, 0), ...
 transitions = [
     hde.transition("flightDown", "footBelowGround", "END", ...
         description = "The apex is too low for the leg angle; the foot would start below ground.")
-    hde.transition("flightDown", "touchdown", "stance", ...
-        description = "Foot contacts the ground.")
+    hde.transition("flightDown", "touchdown", @(x) touchdownPhase(x), ...
+        description = "Foot contacts the ground; stance if the leg can be loaded.")
+    hde.transition("noContact", "missedStance", "END", ...
+        description = "The leg missed stance.")
     hde.transition("flightDown", "fall", "END", ...
         description = "Body reaches the ground before the foot does.")
     hde.transition("stance", "takeoff", "flightUp", ...
@@ -96,7 +111,7 @@ transitions = [
 %% ===== Assemble =====
 model.name        = "SLIP runner";
 model.stateNames  = ["x" "y" "vx" "vy" "xFoot" "yFoot"];
-model.phases      = [flightDown, stance, flightUp];
+model.phases      = [flightDown, stance, flightUp, noContact];
 model.transitions = transitions;
 model.startPhase  = "flightDown";
 model.cyclePhase  = "flightDown";
@@ -138,6 +153,16 @@ end
 function x = stanceToGlobal(s, foot)
 n = size(s, 2);
 x = [s(1:2, :) + foot; s(3:4, :); repmat(foot, 1, n)];
+end
+
+%% ===== Touchdown routing =====
+function name = touchdownPhase(x)
+% Stance if the body moves toward the foot (leg shortening), else no contact.
+if dot(x(1:2) - x(5:6), x(3:4)) < 0
+    name = "stance";
+else
+    name = "noContact";
+end
 end
 
 %% ===== Reset map =====

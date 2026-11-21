@@ -15,6 +15,9 @@ function [T, gaits] = slip_stiffnessFamily(base, kValues, target, opts)
 %                            foot to this height (slip_retractionForClearance);
 %                            the others keep a fixed leg angle. NaN (default)
 %                            gives a fixed leg angle for every gait.
+%             .referenceRetractionDegPerS  common retraction rate (deg/s) for
+%                            the normalized-maximum-drop estimate at one
+%                            rate; default: the base gait's rate
 %
 %   Starting from the base gait, the function steps through stiffness in
 %   both directions and uses each solution as the guess for the next
@@ -34,6 +37,9 @@ if nargin < 4, opts = struct(); end
 if ~isfield(opts, 'stability'), opts.stability = true; end
 if ~isfield(opts, 'terrain'), opts.terrain = false; end
 if ~isfield(opts, 'footClearance'), opts.footClearance = NaN; end
+if ~isfield(opts, 'referenceRetractionDegPerS')
+    opts.referenceRetractionDegPerS = base.p.retractionDegPerS;
+end
 
 % Solve the periodic gaits with a fixed leg angle (the touchdown angle of
 % the base gait); retraction does not change them.
@@ -116,7 +122,9 @@ row = struct('k', k, 'relativeStiffness', NaN, 'legAngleDeg', NaN, ...
     'peakBrakingForceBW', NaN, 'peakElasticEnergy', NaN, ...
     'positiveWorkPerDistance', NaN, 'forceTimeCostIndex', NaN, ...
     'retractionDegPerS', NaN, 'apexClearance', NaN, ...
-    'lambda', NaN, 'maxDrop', NaN, 'dropFailure', "");
+    'lambda', NaN, 'maxDrop', NaN, 'dropFailure', "", ...
+    'stanceHalfAngleDeg', NaN, 'nmdEstimate', NaN, 'nmdSimulated', NaN, ...
+    'nmdEstimateAtReference', NaN);
 if isempty(g)
     return
 end
@@ -142,6 +150,13 @@ if opts.stability
         row.maxDrop = S.maxDrop;
         row.dropFailure = S.dropFailure;
     end
+    % Largest drop with a stance contact (Daley and Usherwood 2010)
+    D = slip_normalizedMaxDrop(g.p, struct('y', g.y, 'vx', g.vx), ...
+        struct('referenceRetractionDegPerS', opts.referenceRetractionDegPerS));
+    row.stanceHalfAngleDeg = D.stanceHalfAngleDeg;
+    row.nmdEstimate = D.estimateNMD;
+    row.nmdSimulated = D.simulatedNMD;
+    row.nmdEstimateAtReference = D.estimateDropAtReference / g.p.L0;
 end
 end
 

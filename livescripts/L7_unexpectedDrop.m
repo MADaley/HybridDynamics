@@ -30,6 +30,18 @@ for name = names
     S = slip_stability(p, [apex.y; apex.vx], struct('jacobian', false));
     fprintf('%-20s largest drop survived for 20 strides: %.2f m (first failure: %s)\n', name, S.maxDrop, S.dropFailure);
 end
+%[text] ## 3. Normalized maximum drop: does the leg make contact?
+%[text] Real animals are not conservative spring-mass systems. After an unexpected drop they can recover through muscle work and damping in the strides that follow, provided the leg makes contact in the stance right after the drop. Daley and Usherwood (2010) measured that first-contact limit with the normalized maximum drop: $\mathrm{NMD} = \Delta H_{max} / L$ with $\Delta H_{max} = \frac{g}{2} (\Phi / \bar{\omega})^2$, where $\Phi$ is the stance half-angle and $\bar{\omega}$ the leg retraction rate. For larger drops the leg rotates past vertical before contact and misses stance.
+%[text] The estimate below uses each gait's own retraction rate and, for comparison at one rate as in the paper, the baseline rate. The simulated value applies the same criterion to the actual flight path, which includes the downward speed at the usual touchdown and the rise of the hip as the leg rotates toward vertical.
+[~, ~, ~, presets] = slip_defaults();
+wRef = presets.retractionDegPerS(presets.name == "human");
+for name = names
+    [p, apex] = slip_defaults(name);
+    D = slip_normalizedMaxDrop(p, apex, struct('referenceRetractionDegPerS', wRef));
+    fprintf('%-20s NMD estimate %.2f (at %.0f deg/s: %.2f); simulated first contact %.2f\n', ...
+        name, D.estimateNMD, wRef, D.estimateDropAtReference / p.L0, D.simulatedNMD);
+end
+%[text] With retraction chosen for a 5 cm foot clearance, the compliant leg retracts fastest and has the smallest NMD. At one common retraction rate the compliant leg has the largest NMD, the outcome Daley and Usherwood (2010) predicted. The conservative 20-stride test above gives far smaller drops: it asks for recovery with no muscle work at all.
 %[text] ## Try this
 %[text] Run `ex08_slip_dropStep` to plot apex height and speed stride by stride.
 %[text] In guinea fowl running over an unexpected drop, adjustment of limb contact angle accounted for 80 % of the variation in stance-phase limb loading after the drop (Daley and Biewener 2006). Use Lesson 3 to explore how the leg angle changes peak force after a drop.

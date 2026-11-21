@@ -39,6 +39,7 @@ presets = {
 
 %% 1. Solve each gait
 rows = cell(size(presets, 1), 1);
+gaitsSolved = cell(size(presets, 1), 1);
 for i = 1:size(presets, 1)
     p = base;
     p.k = presets{i, 3};
@@ -59,6 +60,7 @@ for i = 1:size(presets, 1)
         'apex y = %.5f m  vx = %.5f m/s  lambda = %+.3f  max drop = %.2f m (%s)\n'], ...
         presets{i, 1}, p.k, M.touchdownAngleDeg, q.legAngleDeg, q.retractionDegPerS, ...
         gait.y, gait.vx, S.lambda, S.maxDrop, S.dropFailure);
+    gaitsSolved{i} = struct('p', q, 'apex', apex);
     rows{i} = struct('name', presets{i, 1}, 'label', presets{i, 2}, ...
         'm', p.m, 'L0', p.L0, 'k', p.k, 'g', p.g, ...
         'legAngleDeg', q.legAngleDeg, 'retractionDegPerS', q.retractionDegPerS, ...
@@ -70,7 +72,23 @@ for i = 1:size(presets, 1)
         'peakVerticalForceBW', M.peakVerticalForceBW, 'contactTime', M.contactTime);
 end
 
-%% 2. Write the preset table
+%% 2. Largest drop with a stance contact (Daley and Usherwood 2010)
+% Kinematic estimate at each gait's own retraction rate and at the
+% baseline rate, and the simulated value of the same criterion.
+wRef = gaitsSolved{strcmp([presets{:, 1}], "human")}.p.retractionDegPerS;
+for i = 1:numel(rows)
+    D = slip_normalizedMaxDrop(gaitsSolved{i}.p, gaitsSolved{i}.apex, ...
+        struct('referenceRetractionDegPerS', wRef));
+    rows{i}.stanceHalfAngleDeg = D.stanceHalfAngleDeg;
+    rows{i}.nmdEstimate = D.estimateNMD;
+    rows{i}.nmdSimulated = D.simulatedNMD;
+    rows{i}.nmdEstimateAtReference = D.estimateDropAtReference / gaitsSolved{i}.p.L0;
+    rows{i}.referenceRetractionDegPerS = wRef;
+    fprintf('%-20s NMD estimate %.3f (simulated %.3f; at %.1f deg/s %.3f)\n', rows{i}.name, ...
+        D.estimateNMD, D.simulatedNMD, wRef, rows{i}.nmdEstimateAtReference);
+end
+
+%% 3. Write the preset table
 T = struct2table(vertcat(rows{:}));
 outFile = fullfile(toolDir, '..', 'models', 'slip', 'slip_presets.csv');
 writetable(T, outFile);

@@ -194,6 +194,15 @@
     }
     x = flightState(tTD);
     let t = t0 + tTD;
+    // The leg can be loaded only if the body moves toward the foot
+    // (angle between leg and body velocity below 90 deg), as slip_model.m.
+    if ((x[0] - x[4]) * x[2] + (x[1] - x[5]) * x[3] >= 0) {
+      out.events.push({ time: t, guard: 'touchdown', from: 'flightDown', to: 'noContact', x: x.slice() });
+      out.events.push({ time: t, guard: 'missedStance', from: 'noContact', to: 'END', x: x.slice() });
+      out.reason = 'missedStance';
+      out.xEnd = x; out.tEnd = t; out.trace = tr;
+      return out;
+    }
     out.events.push({ time: t, guard: 'touchdown', from: 'flightDown', to: 'stance', x: x.slice() });
 
     /* ----- Phase 2: stance (Dormand-Prince with event location) ----- */
@@ -560,6 +569,50 @@
     return apex.y - p.L0 * Math.sin(p.legAngleDeg * DEG);
   }
 
+  /* ===================== Normalized maximum drop ===================== */
+  /*
+   * normalizedMaxDrop(p, apex, opts), as slip_normalizedMaxDrop.m.
+   * Daley and Usherwood (2010): the largest drop for which the intended
+   * stance leg makes any contact, estimated as dHmax = g/2 (Phi/omega)^2
+   * with Phi the stance half-angle and omega the retraction rate. Also the
+   * simulated value of the same criterion: the largest drop whose first
+   * touchdown happens with the leg at or in front of vertical and loaded.
+   * opts: {referenceRetractionDegPerS, hMax: 5, tol: 1e-4}
+   */
+  function firstContact(p, y, vx) {
+    const r = simulateStride(p, apexState(p, y, vx));
+    const e = r.events[0];
+    if (!e || e.guard !== 'touchdown') return { loaded: false, angle: NaN };
+    const angle = legAngleDeg(e.x);
+    return { loaded: e.to === 'stance' && angle <= 90, angle: angle };
+  }
+
+  function normalizedMaxDrop(p, apex, opts) {
+    opts = Object.assign({ hMax: 5, tol: 1e-4, referenceRetractionDegPerS: NaN }, opts || {});
+    const c0 = firstContact(p, apex.y, apex.vx);
+    const D = { stanceHalfAngleDeg: 90 - c0.angle, retractionDegPerS: p.retractionDegPerS };
+    const phi = D.stanceHalfAngleDeg * DEG, omega = p.retractionDegPerS * DEG;
+    D.estimateDrop = omega > 0 ? 0.5 * p.g * Math.pow(phi / omega, 2) : Infinity;
+    D.estimateNMD = D.estimateDrop / p.L0;
+    const wRef = opts.referenceRetractionDegPerS;
+    D.estimateDropAtReference = wRef > 0 ? 0.5 * p.g * Math.pow(phi / (wRef * DEG), 2) : NaN;
+    let lo = 0, hi = NaN;
+    for (let h = 0.05; h <= opts.hMax + 1e-9; h += 0.05) {
+      if (firstContact(p, apex.y + h, apex.vx).loaded) lo = h; else { hi = h; break; }
+    }
+    if (isNaN(hi)) {
+      D.simulatedDrop = Infinity;
+    } else {
+      while (hi - lo > opts.tol) {
+        const mid = 0.5 * (lo + hi);
+        if (firstContact(p, apex.y + mid, apex.vx).loaded) lo = mid; else hi = mid;
+      }
+      D.simulatedDrop = lo;
+    }
+    D.simulatedNMD = D.simulatedDrop / p.L0;
+    return D;
+  }
+
   /* ===================== Solvers ===================== */
   function solveLinear(A, b) {
     const n = b.length;
@@ -710,12 +763,18 @@
       row.maxDrop = d.maxDrop;
       row.dropFailure = d.dropFailure;
     }
+    const D = normalizedMaxDrop(g.p, { y: g.y, vx: g.vx },
+      { referenceRetractionDegPerS: opts.referenceRetractionDegPerS });
+    row.stanceHalfAngleDeg = D.stanceHalfAngleDeg;
+    row.nmdEstimate = D.estimateNMD;
+    row.nmdSimulated = D.simulatedNMD;
+    row.nmdEstimateAtReference = D.estimateDropAtReference / g.p.L0;
     return row;
   }
 
   async function stiffnessFamily(base, kValues, target, opts) {
     opts = Object.assign({ drop: false, heights: range(0.01, 0.50, 0.01), nStrides: 20,
-      footClearance: NaN }, opts || {});
+      footClearance: NaN, referenceRetractionDegPerS: base.p.retractionDegPerS }, opts || {});
     // Solve the gaits with a fixed leg angle; retraction leaves them unchanged.
     if (base.p.retractionDegPerS !== 0) {
       const td = touchdownOf(base.p, { y: base.y, vx: base.vx });
@@ -854,6 +913,7 @@
     stridesSurvived: stridesSurvived,
     stridesSurvivedInfo: stridesSurvivedInfo,
     retractionForClearance: retractionForClearance,
+    normalizedMaxDrop: normalizedMaxDrop,
     apexClearance: apexClearance,
     dropTest: dropTest,
     newtonSolve: newtonSolve,
