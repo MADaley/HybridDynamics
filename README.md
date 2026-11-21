@@ -36,15 +36,15 @@ Every example and lesson script begins with labeled blocks of user settings (par
 
 Three periodic gaits of an 80 kg runner with a 1 m leg share an average speed of 4 m/s and 3 steps per second; they differ only in leg stiffness and therefore in touchdown angle. All three retract the swing leg from apex at the same rate: the leg rotation rate measured at touchdown in humans running at 4.07 m/s, 82.2 degrees per gait cycle (Blum et al. 2011), which is 123.3 deg/s for these gaits. Retraction leaves each periodic gait unchanged and lifts the foot several centimeters above the ground at apex. Values come from `models/slip/slip_presets.csv`, written by `tools/slip_computePresets.m`.
 
-| Preset | Leg stiffness (kN/m) | Touchdown angle (deg) | Foot clearance at apex (cm) | Contact time (s) | Peak vertical force (body weights) | Eigenvalue | Largest drop survived, 20 strides (m) |
-|---|---|---|---|---|---|---|---|
-| `humanLowStiffness` | 8 | 58.52 | 4.7 | 0.264 | 2.05 | -0.989 | 0.04 |
-| `human` (baseline) | 12 | 64.01 | 7.4 | 0.222 | 2.40 | -0.940 | 0.07 |
-| `humanHighStiffness` | 20 | 69.55 | 10.2 | 0.177 | 2.98 | -0.891 | 0.11 |
+| Preset | Leg stiffness (kN/m) | Touchdown angle (deg) | Foot clearance at apex (cm) | Contact time (s) | Peak vertical force (body weights) | Eigenvalue |
+|---|---|---|---|---|---|---|
+| `humanLowStiffness` | 8 | 58.52 | 4.7 | 0.264 | 2.05 | -0.989 |
+| `human` (baseline) | 12 | 64.01 | 7.4 | 0.222 | 2.40 | -0.940 |
+| `humanHighStiffness` | 20 | 69.55 | 10.2 | 0.177 | 2.98 | -0.891 |
 
-The baseline relative leg stiffness, k L0 / (m g) = 15.3, lies near the value of 15 that McMahon and Cheng (1990) used for human running. The eigenvalue is the slope of the apex-height return map at constant energy: magnitudes below 1 mean that a small error shrinks from stride to stride, and a negative value means the error changes sign each stride. The drop test lowers the ground once and counts a gait as surviving when it completes 20 further strides.
+The baseline relative leg stiffness, k L0 / (m g) = 15.3, lies near the value of 15 that McMahon and Cheng (1990) used for human running. The eigenvalue is the slope of the apex-height return map at constant energy: magnitudes below 1 mean that a small error shrinks from stride to stride, and a negative value means the error changes sign each stride.
 
-The normalized maximum drop (NMD; Daley and Usherwood 2010) is the largest unexpected drop, as a fraction of leg length, for which the leg still makes stance contact: NMD = (g/2) (Phi / omega)^2 / L, with Phi the stance half-angle and omega the retraction rate. Real animals can recover from a drop through muscle work and damping in the strides that follow, provided the leg makes contact in the stance right after the drop; NMD measures that first-contact limit, and the 20-stride test measures recovery with no muscle work at all. At the common retraction rate, compliant legs have the larger NMD, as Daley and Usherwood (2010) predicted.
+The normalized maximum drop (NMD; Daley and Usherwood 2010) is the largest unexpected drop, as a fraction of leg length, for which the leg still makes stance contact: NMD = (g/2) (Phi / omega)^2 / L, with Phi the stance half-angle and omega the retraction rate. Real animals can recover from a drop through muscle work and damping in the strides that follow, provided the leg makes contact in the stance right after the drop; NMD measures that first-contact limit. At the common retraction rate, compliant legs have the larger NMD, as Daley and Usherwood (2010) predicted.
 
 | Preset | Stance half-angle (deg) | NMD estimate | Simulated first-contact limit |
 |---|---|---|---|
@@ -67,14 +67,14 @@ The simulated first-contact limit follows the actual flight path, including the 
 | 3 | Initial conditions and contact conditions | yes | `L3_initialAndContactConditions.m` |
 | 4 | Periodic gaits and the return map | yes | `L4_returnMapStability.m` |
 | 5 | Same speed, different legs: peak force, leg work, stability | yes | `L5_sameSpeedDifferentLegs.m` |
-| 6 | Choosing a swing-leg retraction rate | yes | `L6_swingLegRetraction.m` |
+| 6 | Choosing swing-leg retraction rate | yes | `L6_swingLegRetraction.m` |
 | 7 | Unexpected drops in the ground | yes | `L7_unexpectedDrop.m` |
 | 8 | Numerical methods: why events can be missed | no | `L8_numericalMethods.m` |
 
 ## Validation
 
 - MATLAB test suite (`tests/runAllTests.m`): closed-form impact times and the Zeno limit for the ball in a box, energy conservation, touchdown detection at tolerances from 1e-3 to 1e-12, parity with the limit cycle of the 2020 code at tight tolerance, periodicity and stability of each preset, the gait solver, every example and lesson script, and a scan for hardcoded paths.
-- Web simulator (`node interactive/tests/test_slipsim.mjs`): event times, apex sequences, stride measures, eigenvalues, drop tests, the gait solver and the stiffness family, checked against reference results exported from MATLAB by `tools/exportWebReference.m`. The GitHub Pages workflow runs these checks before each deployment.
+- Web simulator (`node interactive/tests/test_slipsim.mjs`): event times, apex sequences, stride measures, eigenvalues, drop responses, the gait solver and the stiffness family, checked against reference results exported from MATLAB by `tools/exportWebReference.m`. The GitHub Pages workflow runs these checks before each deployment.
 
 ## Numerical notes
 

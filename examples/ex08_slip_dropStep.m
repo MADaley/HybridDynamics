@@ -1,59 +1,67 @@
-%% EX08_SLIP_DROPSTEP  Recovery from an unexpected drop in the ground
-% Purpose : lower the ground once, by the same height for three gaits that
-%           share one speed and step frequency, and follow apex height and
-%           forward speed stride by stride.
+%% EX08_SLIP_DROPSTEP  The first stance after an unexpected drop in the ground
+% Purpose : lower the ground once, by several heights, for three gaits that
+%           share one speed, step frequency and retraction rate, and plot
+%           the leg force in the stance right after the drop: touchdown
+%           angle, contact and peak force, with the peak force of the same
+%           gait with a fixed leg angle for comparison. Report the
+%           normalized maximum drop (first-contact limit; Daley and
+%           Usherwood 2010).
 % Model   : models/slip
-% Outputs : figure on screen
+% Outputs : figure and table on screen
 % Requires: none (the script adds the toolkit to the path)
 
 clear; close all;
 run(fullfile(fileparts(mfilename('fullpath')), '..', 'setupHybridDynamics.m'));
 
-%% ===== USER SETTINGS: gaits and perturbation =====
+%% ===== USER SETTINGS: gaits and drops =====
 presetNames = ["humanLowStiffness", "human", "humanHighStiffness"];
-dropHeight  = 0.05;               % unexpected drop in ground height (m)
-nStrides    = 15;                 % strides to follow after the drop
+dropHeights = [0 0.05 0.10 0.20];    % unexpected drops in ground height (m); at most four
 
-%% 1. Run each gait through the drop
-n = numel(presetNames);
-yHist = nan(nStrides + 1, n);
-vHist = nan(nStrides + 1, n);
-labels = strings(1, n);
-for j = 1:n
-    [p, apex, ~, presets] = slip_defaults(presetNames(j));
-    labels(j) = presets.label(presets.name == presetNames(j));
-    model = slip_model(p);
-    s = [apex.y + dropHeight; apex.vx];      % apex height above the new ground
-    yHist(1, j) = s(1) - apex.y;
-    vHist(1, j) = s(2);
-    reason = "survived";
-    for i = 1:nStrides
-        [s, info] = slip_returnMap(p, s, model);
-        if any(isnan(s)), reason = info.exitReason; break, end
-        yHist(i + 1, j) = s(1) - apex.y;
-        vHist(i + 1, j) = s(2);
-    end
-    fprintf('%-24s strides completed after the drop: %2d (%s)\n', labels(j), ...
-        sum(~isnan(yHist(2:end, j))), reason);
-end
-
-%% 2. Plot change in apex height and apex speed after the drop
+%% 1. Leg force in the first stance after each drop
 St = daleyStyle('teaching');
-f = St.figure('onehalf', 2);
-tl = tiledlayout(f, 2, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
-ax = nexttile(tl); hold(ax, 'on');
-h = gobjects(1, n);
-for j = 1:n
-    a = St.series(j);
-    h(j) = plot(ax, 0:nStrides, yHist(:, j), a{:});
+f = St.figure('double', 1);
+set(f, 'Position', [1 1 13 4.2], 'PaperSize', [13 4.2], 'PaperPosition', [0 0 13 4.2]);
+tl = tiledlayout(f, 1, numel(presetNames), 'TileSpacing', 'compact', 'Padding', 'compact');
+for j = 1:numel(presetNames)
+    [p, apex, ~, presets] = slip_defaults(presetNames(j));
+    model = slip_model(p);
+    ax = nexttile(tl); hold(ax, 'on');
+    yline(ax, 1, ':', 'Color', St.col.grey, 'LineWidth', St.reflinewidth);    % body weight
+    h = gobjects(1, numel(dropHeights));
+    for i = 1:numel(dropHeights)
+        o = hde.solverDefaults(struct('outputStep', 1e-4, 'maxCycles', 1));
+        r = hde.simulate(model, slip_apexState(p, apex.y + dropHeights(i), apex.vx), o);
+        inStance = r.phase == find(r.phaseNames == "stance");
+        if ~any(inStance), continue, end
+        L = hypot(r.x(1, inStance) - r.x(5, inStance), r.x(2, inStance) - r.x(6, inStance));
+        F = p.k * max(p.L0 - L, 0) / (p.m * p.g);
+        t = r.t(inStance) - r.t(find(inStance, 1));
+        a = St.series(i);
+        h(i) = plot(ax, 1000 * t, F, a{:});
+    end
+    title(ax, presets.label(presets.name == presetNames(j)));
+    xlabel(ax, 'Time from touchdown (ms)'); ylabel(ax, 'Leg force (BW)');
+    St.apply(ax);
+    if j == 1
+        shown = isgraphics(h);
+        legend(ax, h(shown), compose("drop %.0f cm", 100 * dropHeights(shown)), ...
+            'Box', 'off', 'Location', 'northeast', 'FontSize', 9);
+    end
 end
-legend(h, labels, 'Box', 'off', 'Location', 'best');
-ylabel(ax, 'Apex height change (m)');
-St.apply(ax);
-ax = nexttile(tl); hold(ax, 'on');
-for j = 1:n
-    a = St.series(j);
-    plot(ax, 0:nStrides, vHist(:, j), a{:});
+
+%% 2. Table: contact, touchdown angle, peak force and the first-contact limit
+rows = {};
+for j = 1:numel(presetNames)
+    [p, apex] = slip_defaults(presetNames(j));
+    q = slip_retractionRule(p, apex, "fixed");       % same gait, no retraction
+    D = slip_normalizedMaxDrop(p, apex);
+    for i = 1:numel(dropHeights)
+        R = slip_dropResponse(p, apex, dropHeights(i));
+        F = slip_dropResponse(q, apex, dropHeights(i));
+        rows(end+1, :) = {presetNames(j), dropHeights(i), R.firstContact, R.touchdownAngleDeg, ...
+            R.peakLegForceBW, F.peakLegForceBW, D.estimateNMD, D.simulatedNMD}; %#ok<AGROW>
+    end
 end
-xlabel(ax, 'Stride after the drop'); ylabel(ax, 'Apex speed (m/s)');
-St.apply(ax);
+T = cell2table(rows, 'VariableNames', {'preset', 'drop_m', 'contactBeforeVertical', 'touchdownAngleDeg', ...
+    'peakLegForceBW', 'peakLegForceBWfixedAngle', 'nmdEstimate', 'nmdSimulated'});
+disp(T);

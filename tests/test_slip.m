@@ -129,7 +129,7 @@ end
 
 function testDropFailureModeReported(testCase)
 [p, a] = slip_defaults("human");
-S = slip_stability(p, [a.y; a.vx], struct('jacobian', false));
+S = slip_stability(p, [a.y; a.vx], struct('jacobian', false, 'terrain', true));
 verifyNotEmpty(testCase, S.dropFailure);
 verifyTrue(testCase, startsWith(S.dropFailure, "terminal:"));
 end
@@ -146,6 +146,9 @@ verifyEqual(testCase, D.estimateDrop, 0.5 * p.g * (phi / deg2rad(p.retractionDeg
 verifyEqual(testCase, D.estimateDropAtReference, 0.5 * p.g * (phi / deg2rad(100))^2, 'RelTol', 1e-6);
 tv = (90 - p.legAngleDeg) / p.retractionDegPerS;
 verifyEqual(testCase, D.simulatedDrop, p.L0 + 0.5 * p.g * tv^2 - a.y, 'AbsTol', 2e-4);
+% slip_dropResponse applies the same criterion on either side of the limit
+verifyTrue(testCase, slip_dropResponse(p, a, D.simulatedDrop - 0.02).firstContact);
+verifyFalse(testCase, slip_dropResponse(p, a, D.simulatedDrop + 0.02).firstContact);
 q = p; q.retractionDegPerS = 0; q.legAngleDeg = M.touchdownAngleDeg;
 Dfixed = slip_normalizedMaxDrop(q, a);
 verifyEqual(testCase, Dfixed.estimateDrop, Inf);

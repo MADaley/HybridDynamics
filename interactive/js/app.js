@@ -1179,11 +1179,6 @@
       }
     }
     var retr = ok.filter(function (r) { return num(r.retractionDegPerS) > 1e-9; });
-    var drops = ok.filter(function (r) { return isFinite(num(r.maxDrop)); });
-    var dMin = drops.length ? drops.reduce(function (b, r) { return r.maxDrop < b.maxDrop ? r : b; }, drops[0]) : null;
-    var dMax = drops.length ? drops.reduce(function (b, r) { return r.maxDrop > b.maxDrop + 1e-9 ? r : b; }, drops[0]) : null;
-    var modes = {};
-    drops.forEach(function (r) { if (r.dropFailure) modes[String(r.dropFailure).replace('terminal:', '')] = true; });
     var clear = ok.map(function (r) { return num(r.apexClearance); }).filter(isFinite);
     return {
       ok: ok, kMin: k(ok[0]), kMax: k(ok[ok.length - 1]), n: ok.length,
@@ -1195,9 +1190,6 @@
       nRetract: retr.length,
       retrFirst: retr.length ? retr[0] : null, retrLast: retr.length ? retr[retr.length - 1] : null,
       clearanceMin: clear.length ? Math.min.apply(null, clear) : NaN,
-      hasDrop: drops.length > 0,
-      dropMin: dMin, dropMax: dMax, dropMaxValue: dMax ? dMax.maxDrop : NaN, kDropMax: dMax ? k(dMax) : NaN,
-      dropModes: Object.keys(modes),
       speed: ok[0].meanSpeed, frequency: ok[0].stepFrequency
     };
   }
@@ -1269,31 +1261,34 @@
         });
       };
     }
-    var panel = function (field, ylab, refs, legend) {
+    var panel = function (field, ylab, refs, legend, scale) {
+      var sc = scale || 1;
       var cur = rows.filter(function (r) { return Math.abs(r.k - S.p.k) < 1; })[0];
+      var scaled = function (arr) { return arr.map(function (v) { return v * sc; }); };
       return {
         xLabel: 'Leg stiffness (kN/m)', yLabel: ylab, refs: refs || [], legend: legend || null,
-        series: [{ x: kk, y: col(field), style: 0, width: 2 }].concat(presetSeries(field)),
-        marks: S.family.source !== 'matlab' && cur ? [{ x: cur.k / 1000, y: num(cur[field]) }] : []
+        series: [{ x: kk, y: scaled(col(field)), style: 0, width: 2 }].concat(presetSeries(field).map(function (s) {
+          return Object.assign(s, { y: scaled(s.y) });
+        })),
+        marks: S.family.source !== 'matlab' && cur ? [{ x: cur.k / 1000, y: num(cur[field]) * sc }] : []
       };
     };
     var canvas = $('familyCanvas');
     var w = canvas.clientWidth || 600;
     var cols = w >= 980 ? 4 : (w >= 700 ? 3 : (w >= 460 ? 2 : 1));
     var panels = [
-      panel('peakVerticalForceBW', 'Peak vertical force (BW)', [], 'tl'),
+      panel('touchdownAngleDeg', 'Touchdown angle (deg)', [], 'tl'),
+      panel('apexClearance', 'Foot clearance at apex (cm)', [], null, 100),
+      panel('peakVerticalForceBW', 'Peak vertical force (BW)'),
       panel('contactTime', 'Contact time (s)'),
       panel('positiveWorkPerDistance', 'Positive leg work (J/(kg m))'),
       panel('forceTimeCostIndex', 'Force-time cost index (1/s)'),
-      panel('retractionDegPerS', 'Retraction rate (deg/s)'),
       panel('lambda', 'Eigenvalue lambda', [{ y: -1 }, { y: 0 }, { y: 1 }])
     ];
-    if (st.hasDrop) panels.push(panel('maxDrop', 'Largest drop survived (m)'));
     Plot.render(canvas, {
       cols: cols, panelHeight: 210, panels: panels,
       alt: 'Panels against leg stiffness from ' + fmt(st.kMin, 0) + ' to ' + fmt(st.kMax, 0) +
-        ' kN/m at one average speed: peak vertical force, contact time, positive leg work per distance, force-time cost index, retraction rate, eigenvalue lambda' +
-        (st.hasDrop ? ' and largest drop survived.' : '.')
+        ' kN/m at one average speed: touchdown angle, foot clearance at apex, peak vertical force, contact time, positive leg work per distance, force-time cost index and eigenvalue lambda.'
     });
 
     renderFamilyNmd(rows, st);
@@ -1314,12 +1309,6 @@
       ' J/(kg m). The force-time cost index, the inverse of contact time from the force-time hypothesis of Kram and Taylor (1990), ' +
       trendWord(rows, 'forceTimeCostIndex') + ' from ' + fmt(first.forceTimeCostIndex, 2) + ' to ' + fmt(last.forceTimeCostIndex, 2) + ' 1/s. The two proxies rank the gaits in opposite order.');
     parts.push(stabilityText(st));
-    if (st.hasDrop) {
-      parts.push('The largest unexpected drop survived for 20 strides ranges from ' + fmt(st.dropMin.maxDrop * 100, 0) + ' cm at ' +
-        fmt(st.dropMin.k / 1000, 0) + ' kN/m to ' + fmt(st.dropMaxValue * 100, 0) + ' cm at ' + fmt(st.kDropMax, 0) +
-        ' kN/m (drops tested up to 50 cm). ' + (st.dropModes.length ? 'Failure mode at the first drop not survived: ' +
-          st.dropModes.map(reasonText).join('; ') + '.' : 'No gait failed within the tested drops.'));
-    }
     nmdParagraphs(rows).forEach(function (x) { parts.push(x); });
     var ft = $('familyText');
     ft.innerHTML = '';
@@ -1348,10 +1337,8 @@
       ['Force-time cost index (1/s)', function (g) { return fmt(g.r.forceTimeCostIndex, 2); }],
       ['Eigenvalue lambda', function (g) { return fmt(g.pr.lambda, 3); }],
       ['group', 'Unexpected drop (fraction of leg length)'],
-      ['Largest drop survived for 20 strides', function (g) { return fmt(g.pr.maxDrop / g.pr.L0, 2); }],
       ['NMD estimate', function (g) { return nmdText(g.pr.nmdEstimate, 'estimate', 2); }],
-      ['Simulated first-contact limit', function (g) { return nmdText(g.pr.nmdSimulated, 'simulated', 2); }],
-      ['Failure at the first 20-stride drop not survived', function (g) { return reasonText(g.pr.dropFailure); }, 'wrap']
+      ['Simulated first-contact limit', function (g) { return nmdText(g.pr.nmdSimulated, 'simulated', 2); }]
     ];
     var html = '<caption>Values from the MATLAB family. Load sets the sidebar to that gait.</caption><thead><tr><th scope="col">Measure</th>' +
       gaits.map(function (g) { return '<th scope="col">' + g.pr.label + '</th>'; }).join('') + '</tr></thead><tbody>';
@@ -1379,10 +1366,16 @@
 
   // NMD against stiffness: three series, clipped at 3 leg lengths.
   function renderFamilyNmd(rows, st) {
-    var NMD_TOP = 3;
+    var NMD_CAP = 3;
     var kk = rows.map(function (r) { return r.k / 1000; });
     var col = function (f) { return rows.map(function (r) { return finiteOrNaN(r[f]); }); };
     var own = col('nmdEstimate'), sim = col('nmdSimulated');
+    // Scale the axis to the data (10 percent headroom); cap it only when the
+    // values exceed the cap.
+    var finiteVals = own.concat(sim).filter(isFinite);
+    var dataMax = finiteVals.length ? Math.max.apply(null, finiteVals) : 1;
+    var NMD_TOP = Math.min(1.1 * dataMax, NMD_CAP);
+    var capped = 1.1 * dataMax > NMD_CAP;
     Plot.render($('familyNmdCanvas'), {
       panelHeight: 250,
       alt: 'Normalized maximum drop against leg stiffness: the closed-form estimate and the simulated first-contact limit.',
@@ -1398,13 +1391,13 @@
     var notFinite = function (v) { return v === null || v === undefined || v === Infinity; };
     var noLimitOwn = rows.filter(function (r) { return notFinite(r.nmdEstimate); }).length;
     var beyondSim = rows.filter(function (r) { return notFinite(r.nmdSimulated); }).map(function (r) { return r.k / 1000; });
-    var note = 'The axis stops at ' + NMD_TOP + ' leg lengths.';
+    var note = capped ? 'The axis stops at ' + NMD_CAP + ' leg lengths.' : '';
     var a1 = above(own), a2 = above(sim);
     if (a1.length) note += ' The estimate exceeds it from ' + fmt(a1[0], 0) + ' kN/m.';
     if (a2.length) note += ' The simulated limit exceeds it from ' + fmt(a2[0], 0) + ' kN/m.';
     if (beyondSim.length) note += ' From ' + fmt(beyondSim[0], 0) + ' kN/m the simulated limit lies beyond the 5 m search and is left out.';
     if (noLimitOwn) note += ' Gaits with a fixed leg angle have no estimate limit and are left out.';
-    $('familyNmdNote').textContent = note;
+    $('familyNmdNote').textContent = note.trim();
   }
 
   function orderText(list, field, d) {
@@ -1414,7 +1407,7 @@
   // Explanation of NMD, computed from the preset and family rows.
   function nmdParagraphs(rows) {
     var out = [];
-    out.push('Real animals do not behave as a perfect conservative spring-mass system. After an unexpected drop they have time to recover with non-conservative dynamics, such as muscle work and damping, provided the leg makes contact and takes load in the stance right after the drop. The normalized maximum drop of Daley and Usherwood (2010) measures that first-contact limit: NMD = dHmax / L, with dHmax = (g / 2) (Phi / omega)^2, where Phi is the stance half-angle (90 deg minus the touchdown angle), omega the leg retraction rate and L the leg length. For a larger drop the leg rotates past vertical before the foot reaches the ground and misses stance. NMD therefore complements the 20-stride drop test, in which the conservative model cannot remove the energy a drop adds.');
+    out.push('Real animals do not behave as a perfect conservative spring-mass system. After an unexpected drop they have time to recover with non-conservative dynamics, such as muscle work and damping, provided the leg makes contact and takes load in the stance right after the drop. The normalized maximum drop of Daley and Usherwood (2010) measures that first-contact limit: NMD = dHmax / L, with dHmax = (g / 2) (Phi / omega)^2, where Phi is the stance half-angle (90 deg minus the touchdown angle), omega the leg retraction rate and L the leg length. For a larger drop the leg rotates past vertical before the foot reaches the ground and misses stance.');
     var P = PRESETS.map(function (pr) {
       return { label: pr.label, k: pr.k, rate: pr.retractionDegPerS, nmdEstimate: finiteOrNaN(pr.nmdEstimate),
         nmdSimulated: finiteOrNaN(pr.nmdSimulated) };
@@ -1443,7 +1436,6 @@
         nmdText(last.nmdEstimate, 'estimate', 2) + ' at ' + fmt(last.k / 1000, 0) + ' kN/m.';
     }
     out.push(t2);
-    out.push('The two drop measures answer different questions. The 20-stride drop test asks whether the conservative model keeps running after the drop with no way to remove the added energy; NMD asks whether the first stance after the drop begins with a loaded leg, the condition for an animal to recover with muscle work and damping.');
     return out;
   }
 
@@ -1475,7 +1467,6 @@
     var rows;
     try {
       rows = await SlipSim.stiffnessFamily({ p: g.p, y: g.y, vx: g.vx }, kValues, target, {
-        drop: $('familyDrop').checked,
         retractionRule: rule,
         retractionValue: ruleNeedsValue(rule) ? rv : NaN,
         onProgress: function (f) { prog.value = f; }
@@ -1527,7 +1518,6 @@
       ['Foot clearance at apex (cm)', function (r) { return fmt(r.apexClearance * 100, 1); }],
       ['Ground speed matching (%)', function (r) { return fmt(r.groundSpeedMatching * 100, 1); }],
       ['Eigenvalue lambda', function (r) { return fmt(r.lambda, 3); }],
-      ['Largest drop survived for 20 strides (fraction of leg length)', function (r) { return fmt(r.maxDrop / D.base.p.L0, 2); }],
       ['NMD estimate', function (r) { return nmdText(r.nmdEstimate, 'estimate', 2); }],
       ['Simulated first-contact limit', function (r) { return nmdText(r.nmdSimulated, 'simulated', 2); }],
       ['Peak leg force after a ' + fmt(D.dropHeight * 100, 0) + ' cm drop (BW)', function (r) { return fmt(r.peakForceAfterDropBW, 2); }],
@@ -1707,7 +1697,7 @@
     var rules = [], sweep = [];
     try {
       for (var i = 0; i < RULES.length; i++) {
-        rules = rules.concat(SlipSim.compareRetractionRules(p, apex, [RULES[i]], { dropHeight: 0.05, terrain: true }));
+        rules = rules.concat(SlipSim.compareRetractionRules(p, apex, [RULES[i]], { dropHeight: 0.05, terrain: false }));
         prog.value = ++done / total;
         await pause();
       }
@@ -1740,26 +1730,92 @@
     setAnimSource(slipSource(run), undefined);
   }
 
-  // Outcome of a run with one drop after stride 1. Stride 1 runs on the
-  // original ground; strides after it are numbered from the drop.
+  // Outcome of the strides after the drop, reported as an event. Stride 1
+  // runs on the original ground; strides after it are numbered from the drop.
   function dropOutcome(run) {
     var completed = run.apexSeq.length - 1;
     if (run.reason === 'cycleLimit') return { ok: true, after: completed - 1 };
     var failStride = completed;            // index of the stride that did not complete
     var key = String(run.reason).replace('terminal:', '');
-    return { ok: false, beforeDrop: failStride === 0, strideAfter: failStride, completedAfter: Math.max(completed - 1, 0),
-      key: key, text: reasonText(key) };
+    return { ok: false, beforeDrop: failStride === 0, strideAfter: failStride, key: key, text: reasonText(key) };
   }
 
-  function outcomeSentence(o, h, brief) {
-    if (o.ok) return 'completed all ' + o.after + ' strides after the drop';
-    if (o.beforeDrop) return 'stopped before the drop: ' + o.text;
-    var s = 'stopped at stride ' + o.strideAfter + ' after the drop' +
-      (o.strideAfter === 1 ? ' (the first stride after the drop)' : '') + ': ' + o.text;
-    if (!brief && o.key === 'footBelowGround' && o.strideAfter === 2) {
-      s += '. The first stride after the drop completed, and its apex undershot, so the leg could not be placed for the next stride';
+  function laterStridesText(run) {
+    var o = dropOutcome(run);
+    if (o.ok) return 'run continues through the ' + o.after + ' strides simulated after the drop';
+    if (o.beforeDrop) return 'run stops before the drop: ' + o.text;
+    return 'run stops at stride ' + o.strideAfter + ' after the drop: ' + o.text;
+  }
+
+  // First stance after the drop: contact, touchdown angle and peak leg force,
+  // against the steady gait (SlipSim.dropResponse, as
+  // slip_dropResponse.m). apexAtDrop is the apex state where the ground drops.
+  // The fixed-leg-angle comparison keeps the same gait (same touchdown angle
+  // in the steady gait) with no retraction.
+  function firstStance(p, apexAtDrop, h) {
+    var d = SlipSim.dropResponse(p, apexAtDrop, h);
+    var s0 = SlipSim.dropResponse(p, apexAtDrop, 0);
+    // Contact counts as a first stance only with the leg at or in front of
+    // vertical, the first-contact criterion of the simulated NMD.
+    var F = { h: h, contact: d.contact, pastVertical: d.contact && d.touchdownAngleDeg > 90,
+      outcome: d.outcome, angle: d.touchdownAngleDeg, force: d.peakLegForceBW,
+      angle0: s0.touchdownAngleDeg, force0: s0.peakLegForceBW, retracting: p.retractionDegPerS > 0,
+      fixedContact: false, fixedForce: NaN };
+    if (F.retracting) {
+      try {
+        var df = SlipSim.dropResponse(SlipSim.setRetraction(p, apexAtDrop, 0), apexAtDrop, h);
+        F.fixedContact = df.contact;
+        F.fixedForce = df.peakLegForceBW;
+      } catch (e) { /* no fixed-angle comparison for this state */ }
     }
-    return s;
+    return F;
+  }
+
+  // Simulated first-contact limit of the sidebar gait, cached: it does not
+  // depend on the drop height.
+  var simNmdCache = { key: '', value: NaN };
+  function simulatedNmd(p, apex) {
+    var key = JSON.stringify([p, apex]);
+    if (simNmdCache.key !== key) {
+      simNmdCache.key = key;
+      try { simNmdCache.value = SlipSim.normalizedMaxDrop(p, apex).simulatedNMD; } catch (e) { simNmdCache.value = NaN; }
+    }
+    return simNmdCache.value;
+  }
+
+  function firstStanceSentence(F, label, nmdSim, L0) {
+    var who = label ? label + ': ' : '';
+    if (F.pastVertical) {
+      return who + 'the leg reaches the ground only after rotating past vertical (touchdown at ' + fmt(F.angle, 1) +
+        ' deg), so by the first-contact criterion of Daley and Usherwood (2010) the first stance after a ' + fmt(F.h * 100, 1) + ' cm drop is missed' +
+        (isFinite(nmdSim) ? '; the drop is ' + fmt(F.h / L0, 2) + ' leg lengths against a simulated first-contact limit of ' + nmdText(nmdSim, 'simulated', 2) : '') + '.';
+    }
+    if (!F.contact) {
+      return who + 'the leg misses the first stance after a ' + fmt(F.h * 100, 1) + ' cm drop (' + reasonText(F.outcome) + ')' +
+        (isFinite(nmdSim) ? '; the drop is ' + fmt(F.h / L0, 2) + ' leg lengths against a simulated first-contact limit of ' + nmdText(nmdSim, 'simulated', 2) : '') + '.';
+    }
+    return who + 'the leg touches down ' + (F.angle > F.angle0 + 1e-6 ? 'at a steeper angle, ' : 'at ') + fmt(F.angle, 1) + ' deg (' + fmt(F.angle0, 1) + ' deg in the steady gait), ' +
+      'and the peak leg force reaches ' + fmt(F.force, 2) + ' body weights (' +
+      fmt(F.force0, 2) + ' in the steady gait' + (F.retracting && isFinite(F.fixedForce) ? '; ' + fmt(F.fixedForce, 2) + ' with a fixed leg angle' : '') + ')' +
+      (isFinite(nmdSim) ? '; the drop is ' + fmt(F.h / L0, 2) + ' leg lengths, ' + fmt(100 * F.h / (nmdSim * L0), 0) + ' % of the simulated first-contact limit' : '') + '.';
+  }
+
+  function perturbTable(rows) {
+    var head = ['Gait', 'First stance', 'Touchdown angle (deg)', 'Steady gait (deg)', 'Peak leg force (BW)',
+      'Steady gait (BW)', 'Fixed leg angle, same drop (BW)', 'NMD estimate', 'Simulated first-contact limit', 'Later strides'];
+    var html = '<caption>Drop of ' + fmt(S.perturb.drop * 100, 1) + ' cm after stride 1. NMD values in leg lengths.</caption><thead><tr>' +
+      head.map(function (h) { return '<th scope="col">' + h + '</th>'; }).join('') + '</tr></thead><tbody>';
+    rows.forEach(function (r) {
+      var F = r.F;
+      var stance = !F.contact ? 'missed stance' : (F.pastVertical ? 'missed (leg past vertical)' : 'contact');
+      var ok = F.contact && !F.pastVertical;
+      html += '<tr><td>' + r.label + '</td><td>' + stance + '</td><td>' + (F.contact ? fmt(F.angle, 1) : 'n/a') +
+        '</td><td>' + fmt(F.angle0, 1) + '</td><td>' + (ok ? fmt(F.force, 2) : 'n/a') + '</td><td>' + fmt(F.force0, 2) +
+        '</td><td>' + (!F.retracting ? 'same gait' : (F.fixedContact ? fmt(F.fixedForce, 2) : 'missed stance')) +
+        '</td><td>' + nmdText(r.nmdEst, 'estimate', 2) + '</td><td>' + nmdText(r.nmdSim, 'simulated', 2) +
+        '</td><td class="wrap-cell">' + laterStridesText(r.run) + '</td></tr>';
+    });
+    $('perturbTable').innerHTML = html + '</tbody>';
   }
 
   function perturbSeries(run, h) {
@@ -1770,10 +1826,14 @@
       vx: run.apexSeq.map(function (s) { return s.vx; }) };
   }
 
+  function apexAtDrop(run, apex0) {
+    var a = run.apexSeq[1] || apex0;
+    return { y: a.y, vx: a.vx };
+  }
+
   function renderPerturbation() {
     var h = S.perturb.drop;
-    var panels;
-    var text;
+    var panels, text, rows;
     if (S.perturb.compare) {
       var series1 = [], series2 = [];
       S.perturb.compare.forEach(function (c, j) {
@@ -1785,13 +1845,14 @@
         { yLabel: 'Apex height change (m)', series: series1, legend: 'tr', refs: [{ y: 0 }] },
         { yLabel: 'Apex speed (m/s)', xLabel: 'Stride (drop after stride 1)', series: series2 }
       ];
-      var outs = S.perturb.compare.map(function (c) { return dropOutcome(c.run); });
-      text = 'Drop of ' + fmt(h * 100, 1) + ' cm applied to each preset. ' + S.perturb.compare.map(function (c, j) {
-        return c.label + ': ' + outcomeSentence(outs[j], h, true);
-      }).join('. ') + '.';
-      if (outs.some(function (o) { return !o.ok && o.key === 'footBelowGround' && o.strideAfter === 2; })) {
-        text += ' A stop at stride 2 means the first stride after the drop completed and its apex undershot, so the leg could not be placed for the next stride.';
-      }
+      rows = S.perturb.compare.map(function (c) {
+        var st = presetState(c.name), pr = preset(c.name);
+        return { label: c.label, run: c.run, F: firstStance(st.p, apexAtDrop(c.run, st.apex), h),
+          nmdEst: pr.nmdEstimate, nmdSim: pr.nmdSimulated, L0: st.p.L0 };
+      });
+      text = 'First stance after a ' + fmt(h * 100, 1) + ' cm drop. ' + rows.map(function (r) {
+        return firstStanceSentence(r.F, r.label, finiteOrNaN(r.nmdSim), r.L0);
+      }).join(' ');
     } else {
       var run = S.perturb.run;
       if (!run) return;
@@ -1800,12 +1861,14 @@
         { yLabel: 'Apex height change (m)', series: [{ x: s.n, y: s.dy, style: 0, points: true, line: true }], refs: [{ y: 0 }] },
         { yLabel: 'Apex speed (m/s)', xLabel: 'Stride (drop after stride 1)', series: [{ x: s.n, y: s.vx, style: 1, points: true, line: true }] }
       ];
-      var n = run.apexSeq.length - 1;
-      var o = dropOutcome(run);
-      text = 'After a drop of ' + fmt(h * 100, 1) + ' cm the runner ' + outcomeSentence(o, h) + '.';
-      if (o.ok) text += ' Apex speed went from ' + fmt(run.apexSeq[0].vx, 3) + ' to ' + fmt(run.apexSeq[n].vx, 3) +
-        ' m/s: the drop added mechanical energy, and the model has no damping to remove it.';
+      var a = apexAtDrop(run, S.apex);
+      var F = firstStance(S.p, a, h);
+      var est = F.angle0 > 0 ? nmdEstimate(S.p, F.angle0, S.p.retractionDegPerS) : NaN;
+      var sim = simulatedNmd(S.p, a);
+      rows = [{ label: 'Current gait', run: run, F: F, nmdEst: est, nmdSim: sim, L0: S.p.L0 }];
+      text = 'First stance after the drop: ' + firstStanceSentence(F, '', sim, S.p.L0) + ' Later strides: the ' + laterStridesText(run) + '.';
     }
+    perturbTable(rows);
     $('perturbText').textContent = text;
     Plot.render($('perturbCanvas'), { panelHeight: 190, panels: panels,
       alt: 'Apex height change and apex speed for each stride after the drop. ' + text });
@@ -1815,7 +1878,7 @@
     var h = S.perturb.drop;
     S.perturb.compare = PRESETS.slice().sort(function (a, b) { return a.k - b.k; }).map(function (pr) {
       var st = presetState(pr.name);
-      return { label: pr.label, run: SlipSim.simulateStrides(st.p, st.apex, S.perturb.strides + 1,
+      return { name: pr.name, label: pr.label, run: SlipSim.simulateStrides(st.p, st.apex, S.perturb.strides + 1,
         { dropAfterStride: 1, dropHeight: h }) };
     });
     renderPerturbation();
@@ -1959,18 +2022,25 @@
     return function (k) { if (!(k in cache)) cache[k] = fn(k); return cache[k]; };
   }
   // The same preset gait with a fixed leg angle (no retraction).
+  // First stance after drops of DROP_HEIGHTS (m), with the preset retraction
+  // and with a fixed leg angle (same touchdown angle, no retraction).
+  var DROP_HEIGHTS = [0, 0.05, 0.10, 0.20];
+  function dropResponses(st) {
+    var fixed = SlipSim.setRetraction(st.p, st.apex, 0);
+    return DROP_HEIGHTS.map(function (h) {
+      var d = SlipSim.dropResponse(st.p, st.apex, h), df = SlipSim.dropResponse(fixed, st.apex, h);
+      return { h: h, contact: d.contact, outcome: d.outcome, angle: d.touchdownAngleDeg, force: d.peakLegForceBW,
+        fixedContact: df.contact, fixedAngle: df.touchdownAngleDeg, fixedForce: df.peakLegForceBW };
+    });
+  }
+
   function fixedPresetState(n) {
     var st = presetState(n);
     st.p.legAngleDeg = preset(n).touchdownAngleDeg;
     st.p.retractionDegPerS = 0;
     return st;
   }
-  // Largest drop survived for 20 strides and what happens at the first drop not survived.
-  function dropInfo(st) {
-    var d = SlipSim.dropTest(st.p, st.apex, SlipSim.range(0.01, 0.50, 0.01), 20);
-    var first = d.rows.filter(function (r) { return !r.survived; })[0] || null;
-    return { maxDrop: d.maxDrop, first: first };
-  }
+
 
   function buildLessons() {
     var st = familyStats(MATLAB_FAMILY) || {};
@@ -1992,8 +2062,8 @@
         return asArray(asArray(REF.slip.retractionByPreset).filter(function (x) { return x.name === n; })[0].sweep);
       },
       fixedLambda: memo(function (n) { var st = fixedPresetState(n); return SlipSim.lambda(st.p, st.apex); }),
-      drop: memo(function (n) { return dropInfo(presetState(n)); }),
-      fixedDrop: memo(function (n) { return dropInfo(fixedPresetState(n)); })
+      dropHeights: DROP_HEIGHTS,
+      dropResponses: memo(function (n) { return dropResponses(presetState(n)); })
     };
     LESSONS = HDS_LESSONS.build(R);
     var list = $('lessonList');
@@ -2202,7 +2272,7 @@
     // Perturbation
     var dh = $('dropHeight'), dhn = $('dropHeightNum'), ds = $('dropStrides');
     var setDrop = debounce(function (v) {
-      v = clamp(v, 0, 30);
+      v = clamp(v, 0, 60);
       dh.value = v; dhn.value = v;
       S.perturb.drop = v / 100;
       runPerturbation();

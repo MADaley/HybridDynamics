@@ -7,7 +7,7 @@ function S = slip_stability(p, s, opts)
 %   p : parameters; s : apex state [y; vx] of a periodic gait (slip_findGait)
 %   opts (struct, all optional)
 %     .jacobian   also compute the 2-D apex Jacobian (default true)
-%     .terrain    run the drop test (default true)
+%     .terrain    run the 20-stride drop test (default false)
 %     .heights    drop heights to test (m), default 0.01:0.01:0.50
 %     .nStrides   strides to run after the drop (default 20)
 %
@@ -33,7 +33,7 @@ function S = slip_stability(p, s, opts)
 %   foot clearance at apex would meet the foot before the leg is placed.
 
 if nargin < 3, opts = struct(); end
-def = struct('jacobian', true, 'terrain', true, ...
+def = struct('jacobian', true, 'terrain', false, ...
     'heights', 0.01:0.01:0.50, 'nStrides', 20);
 for f = fieldnames(def)'
     if ~isfield(opts, f{1}), opts.(f{1}) = def.(f{1}); end

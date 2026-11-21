@@ -29,20 +29,19 @@ retractionValue = rules{2, 3};      % deg per gait cycle
 
 %% ===== USER SETTINGS: stiffness range and output =====
 kValues     = (6:1:35) * 1000;    % leg stiffness values (N/m)
-runDropTest = true;               % adds about 30 s
 saveResults = true;
 
 %% 1. Solve the family by continuation from the baseline gait
 base = struct('p', p, 'y', apex.y, 'vx', apex.vx);
 tic;
-T = slip_stiffnessFamily(base, kValues, target, struct('terrain', runDropTest, ...
+T = slip_stiffnessFamily(base, kValues, target, struct( ...
     'retractionRule', retractionRule, 'retractionValue', retractionValue));
 fprintf('Solved %d of %d gaits in %.0f s.\n', sum(~isnan(T.legAngleDeg)), height(T), toc);
 
 %% 2. Compare the three presets
 show = ["k" "touchdownAngleDeg" "apexClearance" "contactTime" ...
     "peakVerticalForceBW" "positiveWorkPerDistance" "forceTimeCostIndex" "lambda" ...
-    "maxDrop" "nmdEstimate" "nmdSimulated"];
+    "nmdEstimate" "nmdSimulated"];
 [~, rows] = ismember(presets.k, T.k);
 disp(T(rows, show));
 

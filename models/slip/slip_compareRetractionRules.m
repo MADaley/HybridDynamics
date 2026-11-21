@@ -11,12 +11,12 @@ function T = slip_compareRetractionRules(p, apex, rules, opts)
 %             5 cm foot clearance; fastest recovery; largest ground speed
 %             matching.
 %   opts    : .dropHeight  drop for the peak-force test (m, default 0.05)
-%             .terrain     run the 20-stride drop test (default true)
+%             .terrain     also run the 20-stride drop test (default false)
 %
 %   Every rule keeps the same periodic gait. T has one row per rule:
 %   retraction rate (deg/s and deg per gait cycle), leg angle at apex,
 %   foot clearance at apex, ground speed matching at touchdown, eigenvalue
-%   lambda, largest drop survived for 20 strides, normalized maximum drop
+%   lambda, normalized maximum drop
 %   (estimate and simulated first contact), and peak leg force in the first
 %   stance after a drop of opts.dropHeight.
 %
@@ -27,7 +27,7 @@ if nargin < 3 || isempty(rules)
 end
 if nargin < 4, opts = struct(); end
 if ~isfield(opts, 'dropHeight'), opts.dropHeight = 0.05; end
-if ~isfield(opts, 'terrain'), opts.terrain = true; end
+if ~isfield(opts, 'terrain'), opts.terrain = false; end
 
 n = size(rules, 1);
 rows = cell(n, 1);

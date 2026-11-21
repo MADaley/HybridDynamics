@@ -64,7 +64,7 @@ ref.slip.cases = [cases{:}];
 target = struct('meanSpeed', presets.meanSpeed(1), 'hold', "stepFrequency", ...
     'stepFrequency', presets.stepFrequency(1));
 T = slip_stiffnessFamily(struct('p', p, 'y', apex.y, 'vx', apex.vx), kValues, ...
-    target, struct('terrain', true, 'retractionRule', familyRule{2}, ...
+    target, struct('retractionRule', familyRule{2}, ...
     'retractionValue', familyRule{3}));
 ref.slip.family.target = target;
 ref.slip.family.retraction = struct('name', familyRule{1}, 'rule', familyRule{2}, ...
@@ -153,7 +153,9 @@ if periodic
     for f = keep
         c.metrics.(f) = M.(f);
     end
-    S = slip_stability(p, [apex.y; apex.vx], struct('jacobian', false));
+    % The 20-stride drop test is not shown on the page; it stays here to
+    % check the web simulator's dropTest function.
+    S = slip_stability(p, [apex.y; apex.vx], struct('jacobian', false, 'terrain', true));
     c.lambda = S.lambda;
     c.maxDrop = S.maxDrop;
     c.dropFailure = S.dropFailure;

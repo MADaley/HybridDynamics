@@ -165,7 +165,6 @@
             <label for="familyRuleValue" id="familyRuleValueLabel">Value</label>
             <input type="number" id="familyRuleValue" step="any">
             <button type="button" id="familyRecompute" class="btn">Recompute for current body and speed</button>
-            <label class="check"><input type="checkbox" id="familyDrop"> Include the drop test (slower)</label>
             <button type="button" id="familyRestore" class="btn btn-quiet">Show the MATLAB family</button>
             <progress id="familyProgress" max="1" value="0" hidden></progress>
           </div>
@@ -192,13 +191,16 @@
         <div role="tabpanel" id="panel-perturb" aria-labelledby="tab-perturb" class="tabpanel" hidden>
           <div class="inline-controls">
             <label for="dropHeight">Drop in ground height after stride 1 (cm)</label>
-            <input type="range" id="dropHeight" min="0" max="30" step="0.5" value="5">
-            <input type="number" id="dropHeightNum" min="0" max="30" step="0.5" value="5" aria-label="Drop in ground height in cm">
+            <input type="range" id="dropHeight" min="0" max="60" step="0.5" value="5">
+            <input type="number" id="dropHeightNum" min="0" max="60" step="0.5" value="5" aria-label="Drop in ground height in cm">
             <label for="dropStrides">Strides</label>
             <input type="number" id="dropStrides" min="2" max="40" step="1" value="15">
             <button type="button" id="compareBtn" class="btn">Compare the three presets</button>
           </div>
           <p id="perturbText"></p>
+          <h3>First stance after the drop</h3>
+          <div class="table-wrap"><table id="perturbTable" class="data-table"></table></div>
+          <h3>Apex height and speed, stride by stride</h3>
           <canvas id="perturbCanvas" class="plot"></canvas>
         </div>
 

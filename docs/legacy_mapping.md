@@ -17,7 +17,7 @@ This toolkit replaces the Hybrid Dynamic Engine (2007-2020). The legacy code rem
 | `GetDefault_ICsAndParams_MSR.m` (three versions) | `slip_defaults` with named presets from `slip_presets.csv` |
 | `FixCoupledValues_SLIP.m`, `Set_ICsAndParams.m` | `slip_apexState` |
 | `SLIP_RunOneStrideSummary.m` (four versions), `CalculateForces_Gen.m` | `slip_metrics` |
-| `AddDropStep_SLIP.m`, `TestStabilityMassSpringRunner.m` | `slip_stability` drop test; `ex08_slip_dropStep` |
+| `AddDropStep_SLIP.m`, `TestStabilityMassSpringRunner.m` | `slip_dropResponse`, `slip_normalizedMaxDrop`; `ex08_slip_dropStep` |
 | `SearchMassSpringRunner.m` (stiffness sweeps) | `slip_stiffnessFamily`; `ex06_slip_sameSpeedStiffness` |
 | `BuildBallInBox.m`, `TestBallInBox.m` | `ballInBox_model` (adds a rolling phase); `tests/test_engine.m` |
 | `BuildPendulum.m` | `pendulum_model` (adds an optional wall) |

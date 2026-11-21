@@ -1,4 +1,4 @@
-%[text] # Lesson 6. Choosing a swing-leg retraction rate
+%[text] # Lesson 6. Choosing swing-leg retraction rate
 %[text] Running animals rotate the leg rearward before ground contact (swing-leg retraction). In the model, the leg is set to an angle at apex and rotates at a constant rate during the descending flight, so the touchdown angle depends on how long the body falls (Seyfarth et al. 2003). For a periodic gait the rate can take many values: the leg angle at apex is set so that the leg reaches the same touchdown angle at the same moment, and the gait itself stays the same. The rate changes how the runner responds to perturbations. Which rate should a runner choose?
 here = fileparts(mfilename('fullpath'));
 if isempty(here), here = pwd; end
@@ -8,7 +8,7 @@ run(fullfile(here, '..', 'setupHybridDynamics.m'));
 %[text] Fixed leg angle: no retraction. Human data: the leg rotation rate measured at touchdown in humans running at 4 m/s, 82 degrees per gait cycle (Blum et al. 2011). Foot clearance: the rate that holds the foot 5 cm above the ground at apex. Fastest recovery: the rate at which the stride-to-stride eigenvalue $\lambda$ is zero, so an error in apex height is corrected in one stride. Ground speed matching: the rate at which the foot meets the ground as slowly as a leg of constant length allows, measured by $\mathrm{GSM} = 1 - |v_{foot}| / |v_{CoM}|$ at touchdown (Blum et al. 2010).
 rules = slip_defaultRetractionRules();
 T = slip_compareRetractionRules(p, apex, rules, struct('dropHeight', 0.05));
-T(:, ["name" "retractionDegPerS" "retractionDegPerCycle" "apexClearance" "groundSpeedMatching" "lambda" "maxDrop" "nmdEstimate" "peakForceAfterDropBW"])
+T(:, ["name" "retractionDegPerS" "retractionDegPerCycle" "apexClearance" "groundSpeedMatching" "lambda" "nmdEstimate" "peakForceAfterDropBW"])
 %[text] ## 2. Trade-offs
 %[text] Slow retraction keeps the leg near its touchdown angle for longer, so after an unexpected drop the leg still lands in front of the body: the normalized maximum drop (NMD) is large. It also lands steeply after the longer fall, so the leg force after a drop is high. Fast retraction lowers the leg force after a drop and brings the foot speed closer to the ground speed, at the cost of a small NMD. Daley and Usherwood (2010) described this trade-off between fall risk and injury risk. In this conservative model, fast retraction also drives $\lambda$ below $-1$: the runner overcorrects each stride.
 W = slip_retractionSweep(p, apex, 0:10:250, struct('dropHeight', 0.05));

@@ -1,4 +1,4 @@
-%% EX07_SLIP_RETRACTION  Choosing a swing-leg retraction rate
+%% EX07_SLIP_RETRACTION  Choosing swing-leg retraction rate
 % Purpose : give one periodic gait different swing-leg retraction rates,
 %           chosen by different rules, and compare foot clearance, ground
 %           speed matching, stride-to-stride stability, the normalized
@@ -24,7 +24,7 @@ dropHeight = 0.05;                            % drop for the peak-force test (m)
 %% 1. Compare the rules (every rule keeps the same periodic gait)
 T = slip_compareRetractionRules(p, apex, rules, struct('dropHeight', dropHeight));
 disp(T(:, ["name" "retractionDegPerS" "retractionDegPerCycle" "apexClearance" ...
-    "groundSpeedMatching" "lambda" "maxDrop" "nmdEstimate" "peakForceAfterDropBW"]));
+    "groundSpeedMatching" "lambda" "nmdEstimate" "peakForceAfterDropBW"]));
 
 %% 2. Sweep the retraction rate
 W = slip_retractionSweep(p, apex, omegas, struct('dropHeight', dropHeight));

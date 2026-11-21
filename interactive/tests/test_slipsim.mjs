@@ -106,7 +106,7 @@ for (const c of asArray(ref.slip.cases)) {
     const pr = asArray(ref.slip.presets).find(x => x.name === rp.name);
     const p = { m: pr.m, L0: pr.L0, k: pr.k, g: pr.g, legAngleDeg: pr.legAngleDeg, retractionDegPerS: pr.retractionDegPerS };
     const apex = { y: pr.apexHeight, vx: pr.apexSpeed };
-    const C = Sim.compareRetractionRules(p, apex, rules, { dropHeight: rp.dropHeight, terrain: true });
+    const C = Sim.compareRetractionRules(p, apex, rules, { dropHeight: rp.dropHeight, terrain: false });
     asArray(rp.rules).forEach((r, i) => {
       const lab = `${rp.name} / ${r.name}`;
       close(`${lab}: rate`, C[i].retractionDegPerS, r.retractionDegPerS, 1e-4);
@@ -114,7 +114,6 @@ for (const c of asArray(ref.slip.cases)) {
       close(`${lab}: apex clearance`, C[i].apexClearance, r.apexClearance, 1e-7);
       close(`${lab}: GSM`, C[i].groundSpeedMatching, r.groundSpeedMatching, 1e-6);
       close(`${lab}: lambda`, C[i].lambda, r.lambda, 1e-4);
-      close(`${lab}: 20-stride drop`, C[i].maxDrop, r.maxDrop, 1e-9);
       close(`${lab}: NMD estimate`, C[i].nmdEstimate, r.nmdEstimate, 1e-5, true);
       close(`${lab}: NMD simulated`, C[i].nmdSimulated, r.nmdSimulated, 2e-4);
       close(`${lab}: peak force after drop`, C[i].peakForceAfterDropBW, r.peakForceAfterDropBW, 1e-4, true);

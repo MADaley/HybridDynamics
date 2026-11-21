@@ -9,6 +9,9 @@ function R = slip_dropResponse(p, apex, dropHeight)
 %   R.outcome            exit reason of the stride after the drop
 %                        ("cycleLimit" when the stride completes)
 %   R.contact            true when the leg touches down and is loaded
+%   R.firstContact       true when that loaded touchdown is at or in front
+%                        of vertical (touchdown angle <= 90 deg): the
+%                        first-contact criterion of slip_normalizedMaxDrop
 %   R.touchdownAngleDeg  leg angle at that touchdown (deg)
 %   R.peakLegForceBW     peak leg force in that stance (body weights);
 %                        NaN without a loaded contact
@@ -23,6 +26,7 @@ function R = slip_dropResponse(p, apex, dropHeight)
 R.peakLegForceBWsteady = peakForce(p, apex.y, apex.vx);
 [R.peakLegForceBW, R.contact, R.touchdownAngleDeg, R.outcome] = ...
     peakForce(p, apex.y + dropHeight, apex.vx);
+R.firstContact = R.contact && R.touchdownAngleDeg <= 90;
 end
 
 function [Fbw, contact, tdAngle, outcome] = peakForce(p, y, vx)

@@ -1,9 +1,8 @@
 %% EX05_SLIP_STABILITY  Stride-to-stride stability of a periodic gait
 % Purpose : test whether a small change in apex height grows or shrinks
-%           from stride to stride (return map, eigenvalues), and how large
-%           an unexpected drop in the ground the gait survives.
+%           from stride to stride (return map, eigenvalues).
 % Model   : models/slip
-% Outputs : eigenvalues and drop test in the Command Window; return-map figure
+% Outputs : eigenvalues in the Command Window; return-map figure
 % Requires: none (the script adds the toolkit to the path)
 
 clear; close all;
@@ -16,24 +15,19 @@ presetName = "human";             % "human", "humanLowStiffness", "humanHighStif
 %% ===== USER SETTINGS: perturbations =====
 cobwebStart = 0.01;               % starting change in apex height (m)
 nStrides    = 10;                 % strides in the cobweb
-dropHeights = 0.01:0.01:0.50;     % unexpected drops to test (m)
 
 %% ===== USER SETTINGS: output =====
 saveFigures = false;
 
 %% 1. Eigenvalues of the apex return map
-S = slip_stability(p, [apex.y; apex.vx], struct('heights', dropHeights));
+S = slip_stability(p, [apex.y; apex.vx]);
 fprintf('Preset "%s"\n', presetName);
 fprintf('  lambda (constant-energy apex map) = %+.4f\n', S.lambda);
 fprintf('  2-D apex map eigenvalues: %s\n', mat2str(S.floquet.eigenvalues', 5));
 fprintf('  %s\n', S.floquet.text);
 fprintf('  finite-difference consistency: %.1e\n', S.jacobianConsistency);
 
-%% 2. Unexpected drop in the ground
-fprintf('  largest drop survived for 20 strides: %.2f m\n', S.maxDrop);
-disp(S.dropTable(1:5:end, :));
-
-%% 3. Return map with a cobweb from a perturbed start
+%% 2. Return map with a cobweb from a perturbed start
 f = plotReturnMap(p, apex, struct('start', cobwebStart, 'nStrides', nStrides));
 title(gca, sprintf('\\lambda = %+.2f', S.lambda));
 if saveFigures

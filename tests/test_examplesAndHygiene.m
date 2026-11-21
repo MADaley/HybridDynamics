@@ -72,7 +72,6 @@ function runScript(f)
 % Run a script in a clean function workspace, with saving switched off.
 src = fileread(f);
 src = regexprep(src, '(saveResults|saveFigures)\s*=\s*true', '$1 = false');
-src = regexprep(src, 'runDropTest\s*=\s*true', 'runDropTest = false');
 [folder, name] = fileparts(f);
 copyName = fullfile(folder, ['zz_test_' name '.m']);
 fid = fopen(copyName, 'w');
