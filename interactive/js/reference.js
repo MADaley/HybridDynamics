@@ -4032,10 +4032,10 @@ var HDS_REFERENCE = {
         "legRotation_degPerCycle": 93.9,
         "legRotationSD_degPerCycle": 14.4,
         "legLengthChange_L0PerCycle": 0.95,
-        "groundSpeedMatching_pct": null,
-        "groundSpeedMatchingSD_pct": null,
-        "nmd": null,
-        "nmdSD": null
+        "groundSpeedMatching_pct": 2,
+        "groundSpeedMatchingSD_pct": 19,
+        "nmd": 0.99,
+        "nmdSD": 0.34
       },
       {
         "species": "pheasant",
@@ -4047,10 +4047,10 @@ var HDS_REFERENCE = {
         "legRotation_degPerCycle": 113.2,
         "legRotationSD_degPerCycle": 20,
         "legLengthChange_L0PerCycle": 0.75,
-        "groundSpeedMatching_pct": null,
-        "groundSpeedMatchingSD_pct": null,
-        "nmd": null,
-        "nmdSD": null
+        "groundSpeedMatching_pct": 8,
+        "groundSpeedMatchingSD_pct": 13,
+        "nmd": 0.76,
+        "nmdSD": 0.3
       },
       {
         "species": "pheasant",
@@ -4062,10 +4062,10 @@ var HDS_REFERENCE = {
         "legRotation_degPerCycle": 132.4,
         "legRotationSD_degPerCycle": 4.3,
         "legLengthChange_L0PerCycle": 0.49,
-        "groundSpeedMatching_pct": null,
-        "groundSpeedMatchingSD_pct": null,
-        "nmd": null,
-        "nmdSD": null
+        "groundSpeedMatching_pct": 16,
+        "groundSpeedMatchingSD_pct": 10,
+        "nmd": 0.55,
+        "nmdSD": 0.11
       }
     ],
     "swingLegSource": "Blum Y, Birn-Jeffery A, Daley MA, Seyfarth A (2011) J Theor Biol 281:97-106, Tables 1 and 2"

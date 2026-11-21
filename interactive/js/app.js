@@ -1434,7 +1434,7 @@
     var above = sweep.filter(function (r) { return retrRowValue(r.nmdEstimate) > NMD_TOP; }).map(function (r) { return r.retractionDegPerS; });
     $('retrNote').textContent = 'Shaded spans in every panel: measured leg rotation at touchdown in humans (' + fmt(Math.min.apply(null, hSpeeds), 2) + ' to ' +
       fmt(Math.max.apply(null, hSpeeds), 2) + ' m/s, left span) and pheasants (right span) (Blum et al. 2011), converted from deg per gait cycle to deg/s with this gait\'s cycle of ' +
-      fmt(D.cycle, 3) + ' s. The NMD axis stops at ' + NMD_TOP + ' leg lengths' + (above.length ? '; the estimate exceeds it below ' + fmt(Math.max.apply(null, above) + 5, 0) + ' deg/s and has no limit at 0 deg/s' : '') +
+      fmt(D.cycle, 3) + ' s. Rates per gait cycle compare animals of different size through dynamic similarity; at dynamically similar speeds large birds use relatively higher stride frequencies than small birds (Daley and Birn-Jeffery 2018), so this scaling is an approximation. The NMD axis stops at ' + NMD_TOP + ' leg lengths' + (above.length ? '; the estimate exceeds it below ' + fmt(Math.max.apply(null, above) + 5, 0) + ' deg/s and has no limit at 0 deg/s' : '') +
       '. The point with whiskers on the ground speed matching and NMD panels is the mean +/- SD measured in humans at ' +
       (h4 ? fmt(h4.speed_mps, 2) : '4') + ' m/s (Blum et al. 2011). The labeled filled points mark the five rules. The dotted line on the force panel is the peak leg force in the steady gait.';
     renderRetrText(D, h4, humanRate);
@@ -1920,10 +1920,12 @@
     ['Blum Y, Birn-Jeffery A, Daley MA, Seyfarth A (2011) Does a crouched leg posture enhance running stability and robustness? J Theor Biol 281:97-106.', '10.1016/j.jtbi.2011.04.029'],
     ['Blum Y, Vejdani HR, Birn-Jeffery AV, Hubicki CM, Hurst JW, Daley MA (2014) Swing-leg trajectory of running guinea fowl suggests task-level priority of force regulation rather than disturbance rejection. PLoS One 9:e100399.', '10.1371/journal.pone.0100399'],
     ['Daley MA, Biewener AA (2006) Running over rough terrain reveals limb control for intrinsic stability. Proc Natl Acad Sci USA 103:15681-15686.', '10.1073/pnas.0601473103'],
+    ['Daley MA, Birn-Jeffery A (2018) Scaling of avian bipedal locomotion reveals independent effects of body mass and leg posture on gait. J Exp Biol 221:jeb152538.', '10.1242/jeb.152538'],
     ['Daley MA, Usherwood JR (2010) Two explanations for the compliant running paradox: reduced work of bouncing viscera and increased stability in uneven terrain. Biol Lett 6:418-421.', '10.1098/rsbl.2010.0175'],
     ['Holmes P, Full RJ, Koditschek D, Guckenheimer J (2006) The dynamics of legged locomotion: models, analyses, and challenges. SIAM Rev 48:207-304.', '10.1137/S0036144504445133'],
     ['Kram R, Taylor CR (1990) Energetics of running: a new perspective. Nature 346:265-267.', '10.1038/346265a0'],
     ['McMahon TA, Cheng GC (1990) The mechanics of running: how does stiffness couple with speed? J Biomech 23 Suppl 1:65-78.', '10.1016/0021-9290(90)90042-2'],
+    ['M\u00fcller R, Birn-Jeffery AV, Blum Y (2016) Human and avian running on uneven ground: a model-based comparison. J R Soc Interface 13:20160529.', '10.1098/rsif.2016.0529'],
     ['Seyfarth A, Geyer H, Guenther M, Blickhan R (2002) A movement criterion for running. J Biomech 35:649-655. PMID 11955504.', null],
     ['Seyfarth A, Geyer H, Herr H (2003) Swing-leg retraction: a simple control model for stable running. J Exp Biol 206:2547-2555.', '10.1242/jeb.00463'],
     ['Vejdani HR, Blum Y, Daley MA, Hurst JW (2013) Bio-inspired swing leg control for spring-mass robots running on ground with unexpected height disturbance. Bioinspir Biomim 8:046006.', '10.1088/1748-3182/8/4/046006']
