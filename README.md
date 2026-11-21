@@ -28,32 +28,35 @@ Every example and lesson script begins with labeled blocks of user settings (par
 | `livescripts/` | Lessons 1 to 8 as MATLAB live scripts in plain-text format (R2025a or later opens them in the Live Editor; earlier releases run them as scripts) |
 | `tests/` | `runAllTests.m` and the MATLAB test suite |
 | `tools/` | `slip_computePresets.m` (solves the presets) and `exportWebReference.m` (exports settings and reference results for the web lab) |
+| `data/` | Published measurements used in the lessons, with sources (`data/README.md`) |
 | `interactive/` | The web lab (`index.html`), its simulator (`js/slipsim.js`) and tests that compare it with MATLAB |
 | `docs/` | `concepts.md` (how hybrid models are written and solved) and `legacy_mapping.md` (relation to the 2007-2020 code) |
 
 ## The spring-mass runner presets
 
-Three periodic gaits of an 80 kg runner with a 1 m leg share an average speed of 4 m/s and 3 steps per second; they differ in leg stiffness and therefore in touchdown angle. Each swing leg retracts (rotates rearward) from apex at the rate that holds the foot 5 cm above the ground at apex and still lands at the same angle and time. With a fixed leg angle the foot of these gaits sits only 0.6 to 3 cm above the ground at apex, and small changes in apex height end the run. Values come from `models/slip/slip_presets.csv`, written by `tools/slip_computePresets.m` (the foot clearance is a setting there).
+Three periodic gaits of an 80 kg runner with a 1 m leg share an average speed of 4 m/s and 3 steps per second; they differ only in leg stiffness and therefore in touchdown angle. All three retract the swing leg from apex at the same rate: the leg rotation rate measured at touchdown in humans running at 4.07 m/s, 82.2 degrees per gait cycle (Blum et al. 2011), which is 123.3 deg/s for these gaits. Retraction leaves each periodic gait unchanged and lifts the foot several centimeters above the ground at apex. Values come from `models/slip/slip_presets.csv`, written by `tools/slip_computePresets.m`.
 
-| Preset | Leg stiffness (kN/m) | Touchdown angle (deg) | Retraction (deg/s) | Contact time (s) | Peak vertical force (body weights) | Eigenvalue | Largest drop survived, 20 strides (m) |
+| Preset | Leg stiffness (kN/m) | Touchdown angle (deg) | Foot clearance at apex (cm) | Contact time (s) | Peak vertical force (body weights) | Eigenvalue | Largest drop survived, 20 strides (m) |
 |---|---|---|---|---|---|---|---|
-| `humanLowStiffness` | 8 | 58.52 | 130.4 | 0.264 | 2.05 | -0.994 | 0.04 |
-| `human` (baseline) | 12 | 64.01 | 75.9 | 0.222 | 2.40 | -0.692 | 0.06 |
-| `humanHighStiffness` | 20 | 69.55 | 39.3 | 0.177 | 2.98 | -0.009 | 0.28 |
-
-Normalized maximum drop (NMD; Daley and Usherwood 2010), the largest unexpected drop, as a fraction of leg length, for which the leg still makes stance contact. NMD = (g/2) (Phi / omega)^2 / L, with Phi the stance half-angle and omega the retraction rate.
-
-| Preset | Stance half-angle (deg) | NMD estimate, own retraction | NMD estimate at 75.9 deg/s | Simulated first-contact limit |
-|---|---|---|---|---|
-| `humanLowStiffness` | 31.48 | 0.29 | 0.84 | 0.52 |
-| `human` (baseline) | 25.99 | 0.57 | 0.57 | 0.86 |
-| `humanHighStiffness` | 20.45 | 1.33 | 0.36 | 1.79 |
+| `humanLowStiffness` | 8 | 58.52 | 4.7 | 0.264 | 2.05 | -0.989 | 0.04 |
+| `human` (baseline) | 12 | 64.01 | 7.4 | 0.222 | 2.40 | -0.940 | 0.07 |
+| `humanHighStiffness` | 20 | 69.55 | 10.2 | 0.177 | 2.98 | -0.891 | 0.11 |
 
 The baseline relative leg stiffness, k L0 / (m g) = 15.3, lies near the value of 15 that McMahon and Cheng (1990) used for human running. The eigenvalue is the slope of the apex-height return map at constant energy: magnitudes below 1 mean that a small error shrinks from stride to stride, and a negative value means the error changes sign each stride. The drop test lowers the ground once and counts a gait as surviving when it completes 20 further strides.
 
-Real animals can recover from a drop through muscle work and damping in the strides that follow, provided the leg makes contact in the stance right after the drop; NMD measures that first-contact limit, and the 20-stride test measures recovery with no muscle work at all. At one common retraction rate, compliant legs have the largest NMD, as Daley and Usherwood (2010) predicted; with retraction set by foot clearance, compliant legs retract fastest and the order reverses. The simulated first-contact limit follows the actual flight path, including the downward speed at the usual touchdown and the rise of the hip as the leg rotates toward vertical, which the kinematic estimate leaves out.
+The normalized maximum drop (NMD; Daley and Usherwood 2010) is the largest unexpected drop, as a fraction of leg length, for which the leg still makes stance contact: NMD = (g/2) (Phi / omega)^2 / L, with Phi the stance half-angle and omega the retraction rate. Real animals can recover from a drop through muscle work and damping in the strides that follow, provided the leg makes contact in the stance right after the drop; NMD measures that first-contact limit, and the 20-stride test measures recovery with no muscle work at all. At the common retraction rate, compliant legs have the larger NMD, as Daley and Usherwood (2010) predicted.
 
-Retraction trades foot clearance against stability. The compliant gait lands soonest after apex, so the same 5 cm clearance needs the fastest retraction, which places it near the stability limit of -1. After a large drop, the longer fall lets a retracting leg rotate further and land steeper, and the next apex undershoots by more than the foot clearance; in this model that is how all three presets fail the drop test.
+| Preset | Stance half-angle (deg) | NMD estimate | Simulated first-contact limit |
+|---|---|---|---|
+| `humanLowStiffness` | 31.48 | 0.32 | 0.55 |
+| `human` (baseline) | 25.99 | 0.22 | 0.43 |
+| `humanHighStiffness` | 20.45 | 0.13 | 0.32 |
+
+The simulated first-contact limit follows the actual flight path, including the downward speed at the usual touchdown and the rise of the hip as the leg rotates toward vertical, which the kinematic estimate leaves out.
+
+## Choosing the retraction rate
+
+`slip_retractionRule` sets the rate of any periodic gait by one of five rules, each leaving the gait unchanged: a fixed leg angle; a common rate (deg/s or degrees per gait cycle, for example the human data above); a foot clearance at apex; fastest recovery (eigenvalue zero); and the largest ground speed matching at touchdown, GSM = 1 - |v_foot| / |v_CoM| (Blum et al. 2010). `slip_compareRetractionRules` and `slip_retractionSweep` compare them, and Lesson 6 and `ex07_slip_retraction` show the trade-offs: slow retraction raises the NMD and the leg force after a drop, and fast retraction lowers both (Daley and Usherwood 2010). For the baseline gait the human rate lies between the rate for fastest recovery and the rate for the largest GSM. Measured swing-leg kinematics of running humans and pheasants (Blum et al. 2011) are in `data/swingLegKinematics_Blum2011.csv`.
 
 ## Lessons
 
@@ -64,7 +67,7 @@ Retraction trades foot clearance against stability. The compliant gait lands soo
 | 3 | Initial conditions and contact conditions | yes | `L3_initialAndContactConditions.m` |
 | 4 | Periodic gaits and the return map | yes | `L4_returnMapStability.m` |
 | 5 | Same speed, different legs: peak force, leg work, stability | yes | `L5_sameSpeedDifferentLegs.m` |
-| 6 | Swing-leg retraction | yes | `L6_swingLegRetraction.m` |
+| 6 | Choosing a swing-leg retraction rate | yes | `L6_swingLegRetraction.m` |
 | 7 | Unexpected drops in the ground | yes | `L7_unexpectedDrop.m` |
 | 8 | Numerical methods: why events can be missed | no | `L8_numericalMethods.m` |
 
@@ -84,6 +87,8 @@ The engine descends from the Hybrid Dynamic Engine written by Monica A. Daley fr
 ## References
 
 - Blickhan R (1989) The spring-mass model for running and hopping. J Biomech 22:1217-1227. doi:10.1016/0021-9290(89)90224-8
+- Blum Y, Lipfert SW, Rummel J, Seyfarth A (2010) Swing leg control in human running. Bioinspir Biomim 5:026006. doi:10.1088/1748-3182/5/2/026006
+- Blum Y, Birn-Jeffery A, Daley MA, Seyfarth A (2011) Does a crouched leg posture enhance running stability and robustness? J Theor Biol 281:97-106. doi:10.1016/j.jtbi.2011.04.029
 - Blum Y, Vejdani HR, Birn-Jeffery AV, Hubicki CM, Hurst JW, Daley MA (2014) Swing-leg trajectory of running guinea fowl suggests task-level priority of force regulation rather than disturbance rejection. PLoS One 9:e100399. doi:10.1371/journal.pone.0100399
 - Daley MA, Biewener AA (2006) Running over rough terrain reveals limb control for intrinsic stability. Proc Natl Acad Sci USA 103:15681-15686. doi:10.1073/pnas.0601473103
 - Daley MA, Usherwood JR (2010) Two explanations for the compliant running paradox: reduced work of bouncing viscera and increased stability in uneven terrain. Biol Lett 6:418-421. doi:10.1098/rsbl.2010.0175
@@ -92,6 +97,7 @@ The engine descends from the Hybrid Dynamic Engine written by Monica A. Daley fr
 - McMahon TA, Cheng GC (1990) The mechanics of running: how does stiffness couple with speed? J Biomech 23 Suppl 1:65-78. doi:10.1016/0021-9290(90)90042-2
 - Seyfarth A, Geyer H, Guenther M, Blickhan R (2002) A movement criterion for running. J Biomech 35:649-655. PMID 11955504
 - Seyfarth A, Geyer H, Herr H (2003) Swing-leg retraction: a simple control model for stable running. J Exp Biol 206:2547-2555. doi:10.1242/jeb.00463
+- Vejdani HR, Blum Y, Daley MA, Hurst JW (2013) Bio-inspired swing leg control for spring-mass robots running on ground with unexpected height disturbance. Bioinspir Biomim 8:046006. doi:10.1088/1748-3182/8/4/046006
 
 ## License
 

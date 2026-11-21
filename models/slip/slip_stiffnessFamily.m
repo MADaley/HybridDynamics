@@ -9,12 +9,16 @@ function [T, gaits] = slip_stiffnessFamily(base, kValues, target, opts)
 %   target  : as in slip_findGait (.meanSpeed, .hold and the held value)
 %   opts    : .stability     compute slip_stability for each gait (true)
 %             .terrain       include the drop test (false; slower)
+%             .retractionRule, .retractionValue
+%                            swing-leg retraction for every gait, as in
+%                            slip_retractionRule: "fixed" (default),
+%                            "common" (deg/s), "commonPerCycle" (deg per
+%                            gait cycle), "clearance" (m), "fastestRecovery"
+%                            or "groundSpeedMatching"
 %             .footClearance minimum foot height above the ground at apex
-%                            (m). Gaits whose foot sits lower get swing-leg
-%                            retraction from apex at the rate that lifts the
-%                            foot to this height (slip_retractionForClearance);
-%                            the others keep a fixed leg angle. NaN (default)
-%                            gives a fixed leg angle for every gait.
+%                            (m), an alternative to a rule: gaits whose foot
+%                            sits lower get the retraction that lifts it to
+%                            this height; the others keep a fixed leg angle
 %             .referenceRetractionDegPerS  common retraction rate (deg/s) for
 %                            the normalized-maximum-drop estimate at one
 %                            rate; default: the base gait's rate
@@ -37,6 +41,8 @@ if nargin < 4, opts = struct(); end
 if ~isfield(opts, 'stability'), opts.stability = true; end
 if ~isfield(opts, 'terrain'), opts.terrain = false; end
 if ~isfield(opts, 'footClearance'), opts.footClearance = NaN; end
+if ~isfield(opts, 'retractionRule'), opts.retractionRule = "fixed"; end
+if ~isfield(opts, 'retractionValue'), opts.retractionValue = NaN; end
 if ~isfield(opts, 'referenceRetractionDegPerS')
     opts.referenceRetractionDegPerS = base.p.retractionDegPerS;
 end
@@ -92,16 +98,20 @@ for direction = [1, -1]
 end
 
 %% ----- Measures for each gait -----
-% Add swing-leg retraction where the foot clearance at apex is too small.
+% Add swing-leg retraction: a minimum foot clearance, or a rule.
 for i = 1:n
     g = gaits{i};
-    if isempty(g) || isnan(opts.footClearance)
+    if isempty(g)
         continue
     end
-    natural = g.y - g.p.L0 * sind(g.p.legAngleDeg);
-    if natural < opts.footClearance
-        gaits{i}.p = slip_retractionForClearance(g.p, struct('y', g.y, 'vx', g.vx), ...
-            opts.footClearance);
+    apex = struct('y', g.y, 'vx', g.vx);
+    if ~isnan(opts.footClearance)
+        natural = g.y - g.p.L0 * sind(g.p.legAngleDeg);
+        if natural < opts.footClearance
+            gaits{i}.p = slip_retractionForClearance(g.p, apex, opts.footClearance);
+        end
+    elseif opts.retractionRule ~= "fixed"
+        gaits{i}.p = slip_retractionRule(g.p, apex, opts.retractionRule, opts.retractionValue);
     end
 end
 
@@ -121,7 +131,8 @@ row = struct('k', k, 'relativeStiffness', NaN, 'legAngleDeg', NaN, ...
     'peakVerticalForceBW', NaN, 'peakLegForceBW', NaN, ...
     'peakBrakingForceBW', NaN, 'peakElasticEnergy', NaN, ...
     'positiveWorkPerDistance', NaN, 'forceTimeCostIndex', NaN, ...
-    'retractionDegPerS', NaN, 'apexClearance', NaN, ...
+    'retractionDegPerS', NaN, 'retractionDegPerCycle', NaN, 'apexClearance', NaN, ...
+    'groundSpeedMatching', NaN, ...
     'lambda', NaN, 'maxDrop', NaN, 'dropFailure', "", ...
     'stanceHalfAngleDeg', NaN, 'nmdEstimate', NaN, 'nmdSimulated', NaN, ...
     'nmdEstimateAtReference', NaN);
@@ -141,6 +152,8 @@ row.legAngleDeg = g.p.legAngleDeg;
 row.apexHeight = g.y;
 row.apexSpeed = g.vx;
 row.retractionDegPerS = g.p.retractionDegPerS;
+row.retractionDegPerCycle = g.p.retractionDegPerS * 2 * M.period;
+row.groundSpeedMatching = M.groundSpeedMatching;
 row.apexClearance = g.y - g.p.L0 * sind(g.p.legAngleDeg);
 if opts.stability
     S = slip_stability(g.p, [g.y; g.vx], ...

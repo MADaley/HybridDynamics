@@ -84,7 +84,17 @@
      NMD = dHmax / L with dHmax = (g / 2) (Phi / omega)^2, where Phi is the
      stance half-angle (90 deg minus the touchdown angle) and omega the leg
      retraction rate. JSON null stands for an infinite value. */
-  var REF_RETRACTION = REF.slip.family.referenceRetractionDegPerS;
+  var RULES = asArray(REF.slip.retractionRules);
+  var SWING = asArray(REF.data.swingLeg);
+  var RULE_UNITS = { commonPerCycle: 'deg per gait cycle', common: 'deg/s', clearance: 'm' };
+  var RULE_SHORT = { fixed: 'fixed', commonPerCycle: 'human', common: 'common', clearance: '5 cm',
+    fastestRecovery: 'fastest', groundSpeedMatching: 'GSM' };
+  function cap(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
+  function ruleNeedsValue(rule) { return rule === 'commonPerCycle' || rule === 'common' || rule === 'clearance'; }
+  // The measured human row whose leg rotation per gait cycle equals v.
+  function humanRowFor(v) {
+    return SWING.filter(function (r) { return r.species === 'human' && Math.abs(r.legRotation_degPerCycle - v) < 1e-6; })[0] || null;
+  }
   function nmdEstimate(p, touchdownAngleDeg, retractionDegPerS) {
     var phi = (90 - touchdownAngleDeg) * DEG, om = retractionDegPerS * DEG;
     if (!(om > 0)) return Infinity;
@@ -112,7 +122,8 @@
     periodic: false,
     lambda: NaN,
     cobwebStart: 0.01,
-    clearance: REF.slip.family.footClearance,
+    ruleIndex: 1,
+    retr: null,
     nmd: null,
     family: { rows: MATLAB_FAMILY, source: 'matlab' },
     perturb: { drop: 0.05, strides: 15, run: null, compare: null },
@@ -238,8 +249,8 @@
     pw.appendChild(sel);
     pw.appendChild(el('p', { 'class': 'desc' }, 'Each preset is a periodic gait at ' +
       fmt(FAMILY_TARGET.meanSpeed, 1) + ' m/s and ' + fmt(FAMILY_TARGET.stepFrequency, 1) +
-      ' steps per second, solved in MATLAB. Swing-leg retraction from apex places the foot ' +
-      fmt(PRESETS[0].apexClearance * 100, 1) + ' cm above the ground at apex; the leg lands at the same angle and time as with a fixed leg angle, so the gait is the same.'));
+      ' steps per second, solved in MATLAB. All presets use one swing-leg retraction rate, ' + fmt(REF.slip.family.retraction.value, 1) +
+      ' deg per gait cycle (' + fmt(REF.slip.family.retraction.degPerS, 1) + ' deg/s), the human rate at about 4 m/s (Blum et al. 2011). The leg lands at the same angle and time as with a fixed leg angle, so the gait is the same.'));
     side.appendChild(pw);
 
     SLIP_GROUPS.forEach(function (g) {
@@ -249,7 +260,7 @@
         fs.appendChild(makeControl(r, SLIP_LABELS[r.name] || r.name, SLIP_STEPS[r.name] || 0.01,
           getSlipValue, setSlipValue, onSlipChange));
       });
-      if (g[0] === 'contact condition') fs.appendChild(clearanceBlock());
+      if (g[0] === 'contact condition') fs.appendChild(ruleBlock());
       side.appendChild(fs);
     });
 
@@ -301,57 +312,67 @@
     side.appendChild(fsR);
   }
 
-  // Foot clearance at apex: set the retraction that lifts the foot to a
-  // chosen height at apex, or return to a fixed leg angle.
-  function clearanceBlock() {
+  // Set the retraction rate of the current periodic gait by one of the rules.
+  function ruleBlock() {
     var wrap = el('div', { 'class': 'control' });
+    wrap.appendChild(el('label', { 'for': 'ruleSelect' }, 'Set retraction by rule'));
+    var sel = el('select', { id: 'ruleSelect' });
+    RULES.forEach(function (r, i) { sel.appendChild(el('option', { value: String(i) }, cap(r.name))); });
+    sel.value = String(S.ruleIndex);
+    wrap.appendChild(sel);
     var row = el('div', { 'class': 'target-row' });
-    row.appendChild(el('label', { 'for': 'clearanceInput' }, 'Minimum foot clearance at apex (m)'));
-    var inp = el('input', { type: 'number', id: 'clearanceInput', min: 0, max: 0.3, step: 0.005, value: S.clearance });
-    inp.addEventListener('change', function () {
-      var v = parseFloat(inp.value);
-      if (isFinite(v) && v >= 0) S.clearance = v; else inp.value = S.clearance;
-    });
+    var lab = el('label', { 'for': 'ruleValue', id: 'ruleValueLabel' }, '');
+    var inp = el('input', { type: 'number', id: 'ruleValue', step: 'any' });
+    row.appendChild(lab);
     row.appendChild(inp);
     wrap.appendChild(row);
+    var sync = function () {
+      var r = RULES[parseInt(sel.value, 10)];
+      S.ruleIndex = parseInt(sel.value, 10);
+      row.hidden = !ruleNeedsValue(r.rule);
+      lab.textContent = 'Value (' + (RULE_UNITS[r.rule] || '') + ')';
+      if (ruleNeedsValue(r.rule)) inp.value = r.value;
+    };
+    sel.addEventListener('change', sync);
+    sync();
     var br = el('div', { 'class': 'button-row' });
-    var b1 = el('button', { type: 'button', 'class': 'btn btn-quiet' }, 'Set retraction for this clearance');
-    b1.addEventListener('click', setRetractionForClearance);
-    var b2 = el('button', { type: 'button', 'class': 'btn btn-quiet' }, 'Fixed leg angle');
-    b2.addEventListener('click', setFixedLegAngle);
-    br.appendChild(b1);
-    br.appendChild(b2);
+    var b = el('button', { type: 'button', 'class': 'btn btn-quiet', id: 'ruleApply' }, 'Apply');
+    b.addEventListener('click', applyRule);
+    br.appendChild(b);
     wrap.appendChild(br);
-    wrap.appendChild(el('p', { 'class': 'desc' }, 'Retraction lifts the foot at apex while the leg still lands at the same angle and the same time.'));
+    wrap.appendChild(el('p', { 'class': 'desc' }, 'Each rule sets the retraction rate for the current periodic gait. Retraction changes only the leg angle at apex; the leg lands at the same angle and the same time.'));
     return wrap;
   }
 
-  function setRetractionForClearance() {
-    try {
-      var r = SlipSim.retractionForClearance(S.p, S.apex, S.clearance);
-      S.p.legAngleDeg = r.p.legAngleDeg;
-      S.p.retractionDegPerS = r.p.retractionDegPerS;
-      syncControls();
-      recomputeSlip();
-      updateStatus('Retraction set: leg angle at apex ' + fmt(r.p.legAngleDeg, 2) + ' deg, retraction rate ' +
-        fmt(r.p.retractionDegPerS, 1) + ' deg/s, touchdown angle ' + fmt(r.touchdownAngleDeg, 2) +
-        ' deg. Foot clearance at apex ' + fmt(S.clearance * 100, 1) + ' cm (was ' + fmt(r.apexClearanceBefore * 100, 1) + ' cm).');
-    } catch (e) {
-      updateStatus('Retraction not set: ' + e.message, true);
-    }
-  }
-
-  function setFixedLegAngle() {
-    if (!S.M || !S.M.ok) {
-      updateStatus('The current stride does not complete, so it has no touchdown angle to keep. Load a preset first.', true);
+  function applyRule() {
+    var r = RULES[S.ruleIndex];
+    var v = ruleNeedsValue(r.rule) ? parseFloat($('ruleValue').value) : r.value;
+    if (!S.periodic) {
+      updateStatus('The current apex state is not periodic. Press Find periodic gait or load a preset, then apply the rule.', true);
       return;
     }
-    S.p.legAngleDeg = S.M.touchdownAngleDeg;
-    S.p.retractionDegPerS = 0;
-    syncControls();
-    recomputeSlip();
-    updateStatus('Fixed leg angle: the leg stays at ' + fmt(S.p.legAngleDeg, 2) + ' deg from apex to touchdown. Foot clearance at apex ' +
-      fmt(SlipSim.apexClearance(S.p, S.apex) * 100, 2) + ' cm.');
+    if (ruleNeedsValue(r.rule) && !isFinite(v)) {
+      updateStatus('Enter a value for this rule.', true);
+      return;
+    }
+    var btn = $('ruleApply');
+    btn.disabled = true;
+    setTimeout(function () {
+      try {
+        var info = SlipSim.retractionRule(S.p, S.apex, r.rule, v);
+        S.p.legAngleDeg = info.p.legAngleDeg;
+        S.p.retractionDegPerS = info.p.retractionDegPerS;
+        syncControls();
+        recomputeSlip();
+        updateStatus('Rule applied (' + r.name + '): retraction ' + fmt(info.retractionDegPerS, 1) + ' deg/s (' +
+          fmt(info.retractionDegPerCycle, 1) + ' deg per gait cycle), leg angle at apex ' + fmt(info.p.legAngleDeg, 2) +
+          ' deg, foot clearance at apex ' + fmt(info.apexClearance * 100, 1) + ' cm, ground speed matching ' +
+          fmt(info.gsm * 100, 0) + ' %, lambda ' + fmt(info.lambda, 3) + '.' + (info.note ? ' Note: ' + info.note + '.' : ''), true);
+      } catch (e) {
+        updateStatus('Rule not applied: ' + e.message, true);
+      }
+      btn.disabled = false;
+    }, 20);
   }
 
   function buildBallSidebar() {
@@ -385,6 +406,7 @@
 
   function loadPreset(name) {
     S.presetName = name;
+    S.retr = null;
     var st = presetState(name);
     S.p = st.p;
     S.apex = st.apex;
@@ -419,6 +441,7 @@
     var rows = [
       ['Touchdown angle', M && M.ok ? fmt(M.touchdownAngleDeg, 2) + ' deg' : 'n/a'],
       ['Foot clearance at apex', fmt(SlipSim.apexClearance(p, S.apex) * 100, 2) + ' cm'],
+      ['Ground speed matching', M && M.ok ? fmt(M.groundSpeedMatching * 100, 1) + ' %' : 'n/a'],
       ['Average speed', M && M.ok ? fmt(M.meanSpeed, 3) + ' m/s' : 'n/a'],
       ['Step frequency', M && M.ok ? fmt(M.stepFrequency, 3) + ' 1/s' : 'n/a'],
       ['Froude number v^2/(g L0)', M && M.ok ? fmt(M.froude, 3) : 'n/a'],
@@ -755,7 +778,7 @@
   }
 
   /* ===================== Tabs ===================== */
-  var TABS = ['stride', 'returnMap', 'family', 'perturb', 'map'];
+  var TABS = ['stride', 'returnMap', 'family', 'retraction', 'perturb', 'map'];
 
   function selectTab(name, focus) {
     S.tab = name;
@@ -792,6 +815,7 @@
     if (S.tab === 'stride') renderStride();
     else if (S.tab === 'returnMap') renderReturnMap();
     else if (S.tab === 'family') renderFamily();
+    else if (S.tab === 'retraction') renderRetraction();
     else if (S.tab === 'perturb') renderPerturbation();
     else if (S.tab === 'map') renderGrid();
   }
@@ -850,6 +874,7 @@
       ['Positive leg work per distance', M.positiveWorkPerDistance, 3, 'J/(kg m)'],
       ['Force-time cost index (1/contact time)', M.forceTimeCostIndex, 3, '1/s'],
       ['Energy change over the stride', M.energyChange, 2, 'J (check, ideally 0)'],
+      ['Ground speed matching at touchdown', M.groundSpeedMatching * 100, 1, '%'],
       ['Stance half-angle (90 deg minus touchdown angle)', 90 - M.touchdownAngleDeg, 2, 'deg'],
       ['NMD estimate at the current retraction rate', 'NMD', 3, 'fraction of leg length']
     ];
@@ -870,9 +895,8 @@
       out.textContent = 'The simulated first-contact limit follows the ballistic path after drops of increasing height and finds the largest drop whose first touchdown loads the leg. It takes about a tenth of a second.';
       return;
     }
-    out.textContent = 'Simulated first-contact limit: ' + nmdText(R.simulatedNMD, 'simulated') + ' leg lengths. Estimate at the current retraction rate: ' +
-      nmdText(R.estimateNMD, 'estimate') + '; at the baseline rate of ' + fmt(REF_RETRACTION, 1) + ' deg/s: ' +
-      nmdText(R.estimateDropAtReference / S.p.L0, 'estimate') + '. The simulated value follows the actual ballistic path, so it includes the downward speed at touchdown and the change in hip height, which the estimate leaves out.';
+    out.textContent = 'Simulated first-contact limit: ' + nmdText(R.simulatedNMD, 'simulated') + ' leg lengths. Estimate at the current retraction rate of ' +
+      fmt(S.p.retractionDegPerS, 1) + ' deg/s: ' + nmdText(R.estimateNMD, 'estimate') + '. The simulated value follows the actual ballistic path, so it includes the downward speed at touchdown and the change in hip height, which the estimate leaves out.';
   }
 
   function computeNmd() {
@@ -880,7 +904,7 @@
     btn.disabled = true;
     setTimeout(function () {
       try {
-        S.nmd = SlipSim.normalizedMaxDrop(S.p, S.apex, { referenceRetractionDegPerS: REF_RETRACTION });
+        S.nmd = SlipSim.normalizedMaxDrop(S.p, S.apex);
         renderNmdResult();
         updateStatus($('nmdResult').textContent, true);
       } catch (e) {
@@ -981,7 +1005,7 @@
     var retr = ok.filter(function (r) { return num(r.retractionDegPerS) > 1e-9; });
     var drops = ok.filter(function (r) { return isFinite(num(r.maxDrop)); });
     var dMin = drops.length ? drops.reduce(function (b, r) { return r.maxDrop < b.maxDrop ? r : b; }, drops[0]) : null;
-    var dMax = drops.length ? drops.reduce(function (b, r) { return r.maxDrop > b.maxDrop ? r : b; }, drops[0]) : null;
+    var dMax = drops.length ? drops.reduce(function (b, r) { return r.maxDrop > b.maxDrop + 1e-9 ? r : b; }, drops[0]) : null;
     var modes = {};
     drops.forEach(function (r) { if (r.dropFailure) modes[String(r.dropFailure).replace('terminal:', '')] = true; });
     var clear = ok.map(function (r) { return num(r.apexClearance); }).filter(isFinite);
@@ -1030,13 +1054,24 @@
     return t;
   }
 
-  function retractionText(st, clearance) {
-    if (!st.nRetract) return 'Every gait in this family uses a fixed leg angle (no swing-leg retraction).';
-    var a = st.retrFirst, b = st.retrLast;
-    return (st.nRetract === st.n ? 'Every gait' : st.nRetract + ' of ' + st.n + ' gaits') +
-      ' in this family uses swing-leg retraction to keep the foot at least ' + fmt(clearance * 100, 1) +
-      ' cm above the ground at apex, at rates from ' + fmt(a.retractionDegPerS, 0) + ' deg/s at ' + fmt(a.k / 1000, 0) + ' kN/m to ' +
-      fmt(b.retractionDegPerS, 0) + ' deg/s at ' + fmt(b.k / 1000, 0) + ' kN/m. Retraction leaves each periodic gait unchanged and changes only its stability and its response to perturbations.';
+  // How the family sets swing-leg retraction, written from its rule and rows.
+  function familyRetractionText(rows) {
+    var R = S.family.source === 'matlab' ? REF.slip.family.retraction : S.family.retraction;
+    var a = rows[0], b = rows[rows.length - 1];
+    var tail = ' Retraction leaves each periodic gait unchanged and changes only its stability and its response to perturbations.';
+    if (!R || R.rule === 'fixed') return 'Every gait in this family uses a fixed leg angle (no swing-leg retraction).';
+    if (R.rule === 'commonPerCycle') {
+      var src = humanRowFor(R.value);
+      return 'Every gait in this family uses one retraction rate, ' + fmt(R.value, 1) + ' deg per gait cycle' +
+        (src ? ', the human leg rotation rate at touchdown at ' + fmt(src.speed_mps, 2) + ' m/s (Blum et al. 2011)' : '') +
+        ', which is ' + fmt(a.retractionDegPerS, 1) + ' deg/s for these gaits (gait cycle ' + fmt(2 / a.stepFrequency, 3) + ' s, two steps).' + tail;
+    }
+    if (R.rule === 'common') return 'Every gait in this family uses one retraction rate of ' + fmt(R.value, 1) + ' deg/s.' + tail;
+    var what = { clearance: 'the rate that places the foot ' + fmt(R.value * 100, 1) + ' cm above the ground at apex',
+      fastestRecovery: 'the rate for fastest recovery (lambda = 0, or no retraction where lambda is already negative)',
+      groundSpeedMatching: 'the rate for the largest ground speed matching' }[R.rule] || 'its own retraction rate';
+    return 'Each gait in this family uses ' + what + ', from ' + fmt(a.retractionDegPerS, 1) + ' deg/s at ' + fmt(a.k / 1000, 0) +
+      ' kN/m to ' + fmt(b.retractionDegPerS, 1) + ' deg/s at ' + fmt(b.k / 1000, 0) + ' kN/m.' + tail;
   }
 
   function renderFamily() {
@@ -1087,11 +1122,10 @@
 
     renderFamilyNmd(rows, st);
 
-    var clearance = S.family.source === 'matlab' ? REF.slip.family.footClearance : S.family.footClearance;
     var src = S.family.source === 'matlab' ? 'computed in MATLAB (tools/exportWebReference.m)' : 'computed in this browser for the current body';
     $('familyIntro').textContent = 'Every gait in this family is periodic at an average speed of ' + fmt(st.speed, 2) +
       ' m/s and ' + fmt(st.frequency, 2) + ' steps per second. Each leg stiffness reaches that speed with its own touchdown angle and apex height, so one speed admits many solutions. ' +
-      retractionText(st, clearance) + ' Family ' + src + '.';
+      familyRetractionText(rows) + ' Family ' + src + '.';
 
     var first = rows[0], last = rows[rows.length - 1];
     var parts = [];
@@ -1126,6 +1160,7 @@
       ['Apex height (m)', function (g) { return fmt(g.pr.apexHeight, 4); }],
       ['Leg angle at apex (deg)', function (g) { return fmt(g.pr.legAngleDeg, 2); }],
       ['Retraction rate (deg/s)', function (g) { return fmt(g.pr.retractionDegPerS, 1); }],
+      ['Retraction rate (deg per gait cycle)', function (g) { return fmt(g.pr.retractionDegPerS * 2 / g.pr.stepFrequency, 1); }],
       ['Touchdown angle (deg)', function (g) { return fmt(g.pr.touchdownAngleDeg, 2); }],
       ['Stance half-angle Phi (deg)', function (g) { return fmt(g.pr.stanceHalfAngleDeg, 2); }],
       ['Foot clearance at apex (cm)', function (g) { return fmt(g.pr.apexClearance * 100, 1); }],
@@ -1138,8 +1173,7 @@
       ['Eigenvalue lambda', function (g) { return fmt(g.pr.lambda, 3); }],
       ['group', 'Unexpected drop (fraction of leg length)'],
       ['Largest drop survived for 20 strides', function (g) { return fmt(g.pr.maxDrop / g.pr.L0, 2); }],
-      ['NMD estimate at own retraction rate', function (g) { return nmdText(g.pr.nmdEstimate, 'estimate', 2); }],
-      ['NMD estimate at the baseline rate (' + fmt(REF_RETRACTION, 1) + ' deg/s)', function (g) { return nmdText(g.pr.nmdEstimateAtReference, 'estimate', 2); }],
+      ['NMD estimate', function (g) { return nmdText(g.pr.nmdEstimate, 'estimate', 2); }],
       ['Simulated first-contact limit', function (g) { return nmdText(g.pr.nmdSimulated, 'simulated', 2); }],
       ['Failure at the first 20-stride drop not survived', function (g) { return reasonText(g.pr.dropFailure); }, 'wrap']
     ];
@@ -1172,18 +1206,15 @@
     var NMD_TOP = 3;
     var kk = rows.map(function (r) { return r.k / 1000; });
     var col = function (f) { return rows.map(function (r) { return finiteOrNaN(r[f]); }); };
-    var own = col('nmdEstimate'), atRef = col('nmdEstimateAtReference'), sim = col('nmdSimulated');
-    var refRate = S.family.source === 'matlab' ? REF_RETRACTION : REF_RETRACTION;
+    var own = col('nmdEstimate'), sim = col('nmdSimulated');
     Plot.render($('familyNmdCanvas'), {
       panelHeight: 250,
-      alt: 'Normalized maximum drop against leg stiffness: the estimate at each gait\'s own retraction rate, the estimate at a common retraction rate of ' +
-        fmt(refRate, 1) + ' deg/s, and the simulated first-contact limit.',
+      alt: 'Normalized maximum drop against leg stiffness: the closed-form estimate and the simulated first-contact limit.',
       panels: [{
         xLabel: 'Leg stiffness (kN/m)', yLabel: 'NMD (fraction of leg length)', yLim: [0, NMD_TOP], legend: 'outside',
         series: [
-          { x: kk, y: own, style: 0, label: 'estimate, own retraction rate' },
-          { x: kk, y: atRef, style: 1, label: 'estimate, ' + fmt(refRate, 1) + ' deg/s' },
-          { x: kk, y: sim, style: 2, label: 'simulated first contact' }
+          { x: kk, y: own, style: 0, label: 'estimate' },
+          { x: kk, y: sim, style: 1, label: 'simulated first contact' }
         ]
       }]
     });
@@ -1193,7 +1224,7 @@
     var beyondSim = rows.filter(function (r) { return notFinite(r.nmdSimulated); }).map(function (r) { return r.k / 1000; });
     var note = 'The axis stops at ' + NMD_TOP + ' leg lengths.';
     var a1 = above(own), a2 = above(sim);
-    if (a1.length) note += ' The own-rate estimate exceeds it from ' + fmt(a1[0], 0) + ' kN/m.';
+    if (a1.length) note += ' The estimate exceeds it from ' + fmt(a1[0], 0) + ' kN/m.';
     if (a2.length) note += ' The simulated limit exceeds it from ' + fmt(a2[0], 0) + ' kN/m.';
     if (beyondSim.length) note += ' From ' + fmt(beyondSim[0], 0) + ' kN/m the simulated limit lies beyond the 5 m search and is left out.';
     if (noLimitOwn) note += ' Gaits with a fixed leg angle have no estimate limit and are left out.';
@@ -1210,19 +1241,15 @@
     out.push('Real animals do not behave as a perfect conservative spring-mass system. After an unexpected drop they have time to recover with non-conservative dynamics, such as muscle work and damping, provided the leg makes contact and takes load in the stance right after the drop. The normalized maximum drop of Daley and Usherwood (2010) measures that first-contact limit: NMD = dHmax / L, with dHmax = (g / 2) (Phi / omega)^2, where Phi is the stance half-angle (90 deg minus the touchdown angle), omega the leg retraction rate and L the leg length. For a larger drop the leg rotates past vertical before the foot reaches the ground and misses stance. NMD therefore complements the 20-stride drop test, in which the conservative model cannot remove the energy a drop adds.');
     var P = PRESETS.map(function (pr) {
       return { label: pr.label, k: pr.k, rate: pr.retractionDegPerS, nmdEstimate: finiteOrNaN(pr.nmdEstimate),
-        nmdEstimateAtReference: finiteOrNaN(pr.nmdEstimateAtReference), nmdSimulated: finiteOrNaN(pr.nmdSimulated) };
+        nmdSimulated: finiteOrNaN(pr.nmdSimulated) };
     });
     var by = function (f) { return P.filter(function (g) { return isFinite(g[f]); }).sort(function (a, b) { return a[f] - b[f]; }); };
-    var own = by('nmdEstimate'), atRef = by('nmdEstimateAtReference'), sim = by('nmdSimulated');
+    var est = by('nmdEstimate'), sim = by('nmdSimulated');
     var compliant = P.reduce(function (a, b) { return b.k < a.k ? b : a; });
-    var fastest = P.reduce(function (a, b) { return b.rate > a.rate ? b : a; });
-    var t = 'At each preset\'s own retraction rate the NMD estimate rises from ' + orderText(own, 'nmdEstimate', 2) + '.';
-    if (own.length && own[0].label === fastest.label) {
-      t += ' Retraction set for ' + fmt(REF.slip.family.footClearance * 100, 0) + ' cm of foot clearance is fastest for the ' + fastest.label.toLowerCase() +
-        ' gait (' + fmt(fastest.rate, 0) + ' deg/s), so its leg reaches vertical soonest and its own-rate NMD is the smallest.';
-    }
-    t += ' At one common retraction rate of ' + fmt(REF_RETRACTION, 1) + ' deg/s the estimate rises from ' + orderText(atRef, 'nmdEstimateAtReference', 2) + '.';
-    if (atRef.length && atRef[atRef.length - 1].label === compliant.label) {
+    var common = P.every(function (g) { return Math.abs(g.rate - P[0].rate) < 1e-6; });
+    var t = (common ? 'With every preset at the same retraction rate of ' + fmt(P[0].rate, 1) + ' deg/s, the' : 'The') +
+      ' NMD estimate rises from ' + orderText(est, 'nmdEstimate', 2) + '.';
+    if (common && est.length && est[est.length - 1].label === compliant.label) {
       t += ' At a common rate the most compliant leg, with the widest stance half-angle, has the largest NMD, the outcome Daley and Usherwood (2010) predicted.';
     }
     out.push(t);
@@ -1230,14 +1257,14 @@
       .map(function (g) { return g.nmdSimulated / g.nmdEstimate; });
     var t2 = 'The simulated first-contact limit follows the actual ballistic path and rises from ' + orderText(sim, 'nmdSimulated', 2) + '.';
     if (ratios.length && ratios.every(function (r) { return r > 1; })) {
-      t2 += ' It exceeds the own-rate estimate in every preset, by a factor of ' + fmt(Math.min.apply(null, ratios), 2) + ' to ' + fmt(Math.max.apply(null, ratios), 2) +
+      t2 += ' It exceeds the estimate in every preset, by a factor of ' + fmt(Math.min.apply(null, ratios), 2) + ' to ' + fmt(Math.max.apply(null, ratios), 2) +
         ', because it includes the downward speed of the body at touchdown and the change in hip height, which the estimate leaves out.';
     }
     var first = rows[0], last = rows[rows.length - 1];
-    if (first && last && isFinite(finiteOrNaN(first.nmdEstimateAtReference))) {
-      t2 += ' Across the family, the estimate at the common rate ' + (finiteOrNaN(last.nmdEstimateAtReference) > finiteOrNaN(first.nmdEstimateAtReference) ? 'rises' : 'falls') +
-        ' from ' + nmdText(first.nmdEstimateAtReference, 'estimate', 2) + ' at ' + fmt(first.k / 1000, 0) + ' kN/m to ' +
-        nmdText(last.nmdEstimateAtReference, 'estimate', 2) + ' at ' + fmt(last.k / 1000, 0) + ' kN/m.';
+    if (first && last && isFinite(finiteOrNaN(first.nmdEstimate)) && isFinite(finiteOrNaN(last.nmdEstimate))) {
+      t2 += ' Across the family, the estimate ' + (finiteOrNaN(last.nmdEstimate) > finiteOrNaN(first.nmdEstimate) ? 'rises' : 'falls') +
+        ' from ' + nmdText(first.nmdEstimate, 'estimate', 2) + ' at ' + fmt(first.k / 1000, 0) + ' kN/m to ' +
+        nmdText(last.nmdEstimate, 'estimate', 2) + ' at ' + fmt(last.k / 1000, 0) + ' kN/m.';
     }
     out.push(t2);
     out.push('The two drop measures answer different questions. The 20-stride drop test asks whether the conservative model keeps running after the drop with no way to remove the added energy; NMD asks whether the first stance after the drop begins with a loaded leg, the condition for an animal to recover with muscle work and damping.');
@@ -1247,8 +1274,12 @@
   async function recomputeFamily() {
     var btn = $('familyRecompute'), prog = $('familyProgress');
     var target = { meanSpeed: S.target.meanSpeed, hold: 'stepFrequency', stepFrequency: S.target.stepFrequency };
-    var cIn = parseFloat($('familyClearance').value);
-    var clearance = isFinite(cIn) && cIn > 0 ? cIn : NaN;
+    var rule = $('familyRule').value;
+    var rv = parseFloat($('familyRuleValue').value);
+    if (ruleNeedsValue(rule) && !isFinite(rv)) {
+      updateStatus('Enter a value for the retraction rule.', true);
+      return;
+    }
     btn.disabled = true;
     updateStatus('Finding the periodic gait at the target speed and step frequency...', true);
     await pause();
@@ -1269,8 +1300,8 @@
     try {
       rows = await SlipSim.stiffnessFamily({ p: g.p, y: g.y, vx: g.vx }, kValues, target, {
         drop: $('familyDrop').checked,
-        footClearance: clearance,
-        referenceRetractionDegPerS: REF_RETRACTION,
+        retractionRule: rule,
+        retractionValue: ruleNeedsValue(rule) ? rv : NaN,
         onProgress: function (f) { prog.value = f; }
       });
     } catch (e) {
@@ -1281,10 +1312,246 @@
     }
     prog.hidden = true;
     btn.disabled = false;
-    S.family = { rows: rows, source: 'browser', footClearance: clearance };
+    S.family = { rows: rows, source: 'browser', retraction: { rule: rule, value: rv } };
     recomputeSlip();
     updateStatus('Family recomputed: ' + rows.filter(okRow).length + ' of ' + rows.length + ' gaits solved' +
-      (isFinite(clearance) ? ', with retraction where needed for ' + fmt(clearance * 100, 1) + ' cm of foot clearance.' : ', with a fixed leg angle.'), true);
+      ', retraction rule: ' + $('familyRule').selectedOptions[0].textContent.toLowerCase() + '.', true);
+  }
+
+  /* ----- Retraction rate tab ----- */
+  // Results for the current preset from MATLAB, or for the current gait
+  // computed in the browser.
+  function retrData() {
+    if (S.retr && S.retr.source === 'browser') return S.retr;
+    var e = asArray(REF.slip.retractionByPreset).filter(function (x) { return x.name === S.presetName; })[0];
+    var pr = preset(S.presetName);
+    return { source: 'matlab', label: pr.label, presetName: S.presetName, base: presetState(S.presetName),
+      rules: asArray(e.rules), sweep: asArray(e.sweep), dropHeight: e.dropHeight,
+      cycle: 2 / pr.stepFrequency, k: pr.k, speed: pr.meanSpeed };
+  }
+
+  function retrRowValue(v) { return v === null || v === undefined ? Infinity : v; }
+
+  function renderRetraction() {
+    var D = retrData();
+    var rules = D.rules, sweep = D.sweep;
+    var hum = SWING.filter(function (r) { return r.species === 'human'; });
+    var phe = SWING.filter(function (r) { return r.species === 'pheasant'; });
+    var h4 = humanRowFor(REF.slip.family.retraction.value);
+    $('retrIntro').textContent = 'Five rules set the swing-leg retraction rate for the ' + D.label.toLowerCase() + ' gait (leg stiffness ' +
+      fmt(D.k / 1000, 0) + ' kN/m, average speed ' + fmt(D.speed, 2) + ' m/s, gait cycle ' + fmt(D.cycle, 3) +
+      ' s, two steps). Retraction leaves the periodic gait unchanged: every rule keeps the same touchdown angle, stance, speed and step frequency, and changes only the leg angle at apex. ' +
+      (D.source === 'matlab' ? 'Results computed in MATLAB for this preset; load another preset to compare.' : 'Results computed in this browser for the current gait.');
+
+    // Rule comparison table: one row per measure, one column per rule.
+    var measures = [
+      ['Retraction rate (deg/s)', function (r) { return fmt(r.retractionDegPerS, 1); }],
+      ['Retraction rate (deg per gait cycle)', function (r) { return fmt(r.retractionDegPerCycle, 1); }],
+      ['Leg angle at apex (deg)', function (r) { return fmt(r.apexLegAngleDeg, 2); }],
+      ['Foot clearance at apex (cm)', function (r) { return fmt(r.apexClearance * 100, 1); }],
+      ['Ground speed matching (%)', function (r) { return fmt(r.groundSpeedMatching * 100, 1); }],
+      ['Eigenvalue lambda', function (r) { return fmt(r.lambda, 3); }],
+      ['Largest drop survived for 20 strides (fraction of leg length)', function (r) { return fmt(r.maxDrop / D.base.p.L0, 2); }],
+      ['NMD estimate', function (r) { return nmdText(r.nmdEstimate, 'estimate', 2); }],
+      ['Simulated first-contact limit', function (r) { return nmdText(r.nmdSimulated, 'simulated', 2); }],
+      ['Peak leg force after a ' + fmt(D.dropHeight * 100, 0) + ' cm drop (BW)', function (r) { return fmt(r.peakForceAfterDropBW, 2); }],
+      ['Peak leg force in the steady gait (BW)', function (r) { return fmt(r.peakForceSteadyBW, 2); }],
+      ['Note', function (r) { return r.note ? r.note : ''; }, 'wrap']
+    ];
+    var html = '<caption>Retraction rules for the ' + D.label.toLowerCase() + ' gait. Load sets the sidebar to that rule.</caption><thead><tr><th scope="col">Measure</th>' +
+      rules.map(function (r) { return '<th scope="col">' + cap(r.name) + '</th>'; }).join('') + '</tr></thead><tbody>';
+    measures.forEach(function (m) {
+      html += '<tr' + (m[2] ? ' class="' + m[2] + '"' : '') + '><th scope="row">' + m[0] + '</th>' +
+        rules.map(function (r) { return '<td>' + m[1](r) + '</td>'; }).join('') + '</tr>';
+    });
+    html += '<tr><td></td>' + rules.map(function (r, i) {
+      return '<td><button type="button" class="btn btn-quiet load-rule" data-index="' + i + '" aria-label="Load ' + r.name + '">Load</button></td>';
+    }).join('') + '</tr>';
+    var tbl = $('retrTable');
+    tbl.innerHTML = html + '</tbody>';
+    Array.prototype.forEach.call(tbl.querySelectorAll('.load-rule'), function (b) {
+      b.addEventListener('click', function () { loadRule(D, rules[parseInt(b.getAttribute('data-index'), 10)]); });
+    });
+
+    // Small multiples against retraction rate
+    var w = sweep.map(function (r) { return r.retractionDegPerS; });
+    var col = function (f, scale) { return sweep.map(function (r) { return finiteOrNaN(r[f]) * (scale || 1); }); };
+    var toRate = function (perCycle) { return perCycle / D.cycle; };
+    var span = function (rows, label) {
+      var v = rows.map(function (r) { return toRate(r.legRotation_degPerCycle); });
+      return { x0: Math.min.apply(null, v), x1: Math.max.apply(null, v), label: label };
+    };
+    var hSpeeds = hum.map(function (r) { return r.speed_mps; });
+    var spans = [span(hum, 'humans ' + fmt(Math.min.apply(null, hSpeeds), 0) + ' to ' + fmt(Math.max.apply(null, hSpeeds), 0) + ' m/s'), span(phe, 'pheasants')];
+    // Span labels appear in the first panel only; the note names them.
+    var spansPlain = spans.map(function (sp) { return { x0: sp.x0, x1: sp.x1 }; });
+    var C = Plot.colors();
+    var markerColor = C.series[1];
+    var ruleMarks = function (field, scale) {
+      var pts = rules.map(function (r) { return { x: r.retractionDegPerS, y: finiteOrNaN(r[field]) * (scale || 1), name: RULE_SHORT[r.rule] || r.name }; });
+      // Rules at nearly the same rate get their labels staggered.
+      var sorted = pts.slice().sort(function (a, b) { return a.x - b.x; });
+      var range = Math.max.apply(null, w) || 1;
+      sorted.forEach(function (p, i) {
+        var close = i > 0 && p.x - sorted[i - 1].x < 0.12 * range;
+        p.dy = (i % 2 === 0 ? -1 : 1) * (close ? 15 : 10);
+      });
+      return {
+        series: [{ x: pts.map(function (p) { return p.x; }), y: pts.map(function (p) { return p.y; }), points: true, style: 1, color: markerColor, radius: 4.5 }],
+        labels: pts.map(function (p) { return { x: p.x, y: p.y, text: p.name, dy: p.dy, color: C.text }; })
+      };
+    };
+    var humanRate = h4 ? toRate(h4.legRotation_degPerCycle) : NaN;
+    var panel = function (field, scale, ylab, extra) {
+      var M = ruleMarks(field, scale);
+      var P = { xLabel: 'Retraction rate (deg/s)', yLabel: ylab, xLim: [0, Math.max.apply(null, w)], shade: spansPlain,
+        series: [{ x: w, y: col(field, scale), style: 0, width: 2 }].concat(M.series), labels: M.labels };
+      return Object.assign(P, extra || {});
+    };
+    var steady = rules.length ? rules[0].peakForceSteadyBW : NaN;
+    var nmdM = ruleMarks('nmdEstimate', 1);
+    var NMD_TOP = 3;
+    var humanLabel = h4 ? 'humans, ' + fmt(h4.speed_mps, 0) + ' m/s' : '';
+    var panels = [
+      panel('apexClearance', 100, 'Foot clearance at apex (cm)', { shade: spans }),
+      panel('groundSpeedMatching', 100, 'Ground speed matching (%)', h4 ? { whiskers: [{ x: humanRate, y: h4.groundSpeedMatching_pct,
+        lo: h4.groundSpeedMatching_pct - h4.groundSpeedMatchingSD_pct, hi: h4.groundSpeedMatching_pct + h4.groundSpeedMatchingSD_pct,
+        label: humanLabel, align: 'right', dx: -7 }] } : {}),
+      panel('lambda', 1, 'Eigenvalue lambda', { refs: [{ y: -1 }, { y: 0 }, { y: 1 }] }),
+      { xLabel: 'Retraction rate (deg/s)', yLabel: 'NMD (fraction of leg length)', xLim: [0, Math.max.apply(null, w)], yLim: [0, NMD_TOP],
+        shade: spansPlain, legend: 'tr',
+        series: [{ x: w, y: col('nmdEstimate'), style: 0, width: 2, label: 'estimate' },
+          { x: w, y: col('nmdSimulated'), style: 2, label: 'simulated first contact' }].concat(nmdM.series)
+          .concat(h4 ? [{ x: [], y: [], points: true, color: C.ink, radius: 3.5, label: humanLabel + ' (mean +/- SD)' }] : []),
+        labels: nmdM.labels,
+        whiskers: h4 ? [{ x: humanRate, y: h4.nmd, lo: h4.nmd - h4.nmdSD, hi: h4.nmd + h4.nmdSD }] : [] },
+      panel('peakForceAfterDropBW', 1, 'Peak leg force after a ' + fmt(D.dropHeight * 100, 0) + ' cm drop (BW)', { refs: [{ y: steady }] })
+    ];
+    var canvas = $('retrCanvas');
+    var cw = canvas.clientWidth || 600;
+    Plot.render(canvas, { cols: cw >= 900 ? 3 : (cw >= 460 ? 2 : 1), panelHeight: 230, panels: panels,
+      alt: 'Foot clearance, ground speed matching, eigenvalue lambda, normalized maximum drop and peak leg force after a drop against retraction rate, with the five rules marked and the measured human and pheasant ranges shaded.' });
+    var above = sweep.filter(function (r) { return retrRowValue(r.nmdEstimate) > NMD_TOP; }).map(function (r) { return r.retractionDegPerS; });
+    $('retrNote').textContent = 'Shaded spans in every panel: measured leg rotation at touchdown in humans (' + fmt(Math.min.apply(null, hSpeeds), 2) + ' to ' +
+      fmt(Math.max.apply(null, hSpeeds), 2) + ' m/s, left span) and pheasants (right span) (Blum et al. 2011), converted from deg per gait cycle to deg/s with this gait\'s cycle of ' +
+      fmt(D.cycle, 3) + ' s. The NMD axis stops at ' + NMD_TOP + ' leg lengths' + (above.length ? '; the estimate exceeds it below ' + fmt(Math.max.apply(null, above) + 5, 0) + ' deg/s and has no limit at 0 deg/s' : '') +
+      '. The point with whiskers on the ground speed matching and NMD panels is the mean +/- SD measured in humans at ' +
+      (h4 ? fmt(h4.speed_mps, 2) : '4') + ' m/s (Blum et al. 2011). The labeled filled points mark the five rules. The dotted line on the force panel is the peak leg force in the steady gait.';
+    renderRetrText(D, h4, humanRate);
+    renderSwingTable(D);
+  }
+
+  // Interpretation computed from the rule rows and the sweep.
+  function renderRetrText(D, h4, humanRate) {
+    var rules = D.rules, sweep = D.sweep;
+    var byRate = rules.slice().sort(function (a, b) { return a.retractionDegPerS - b.retractionDegPerS; });
+    var parts = [];
+    parts.push('Ordered by retraction rate: ' + byRate.map(function (r) { return r.name + ' (' + fmt(r.retractionDegPerS, 1) + ' deg/s)'; }).join(', ') + '.');
+    var first = sweep[0], last = sweep[sweep.length - 1];
+    var fin = sweep.filter(function (r) { return isFinite(retrRowValue(r.nmdEstimate)); });
+    var nmdFalls = fin.length > 1 && fin[fin.length - 1].nmdEstimate < fin[0].nmdEstimate;
+    var forceFalls = last.peakForceAfterDropBW < first.peakForceAfterDropBW;
+    var t = 'As the retraction rate rises from ' + fmt(fin.length ? fin[0].retractionDegPerS : first.retractionDegPerS, 0) + ' to ' + fmt(last.retractionDegPerS, 0) + ' deg/s, the NMD estimate ' +
+      (nmdFalls ? 'falls' : 'rises') + ' from ' + nmdText(fin.length ? fin[0].nmdEstimate : NaN, 'estimate', 2) + ' to ' + nmdText(last.nmdEstimate, 'estimate', 2) +
+      ' (it has no limit at 0 deg/s). From ' + fmt(first.retractionDegPerS, 0) + ' to ' + fmt(last.retractionDegPerS, 0) + ' deg/s the peak leg force after a ' +
+      fmt(D.dropHeight * 100, 0) + ' cm drop ' + (forceFalls ? 'falls' : 'rises') + ' from ' + fmt(first.peakForceAfterDropBW, 2) + ' to ' +
+      fmt(last.peakForceAfterDropBW, 2) + ' body weights (steady gait ' + fmt(rules[0].peakForceSteadyBW, 2) + ').';
+    if (nmdFalls && forceFalls) {
+      t += ' This is the trade-off of Daley and Usherwood (2010): slow retraction keeps a large first-contact margin (lower fall risk) and loads the leg harder after a drop; fast retraction lowers the force after a drop (lower injury risk) and shrinks the first-contact margin.';
+    }
+    parts.push(t);
+    var over = sweep.filter(function (r) { return r.lambda < -1; });
+    parts.push(over.length ? 'In this conservative model, lambda falls below -1 above about ' + fmt(over[0].retractionDegPerS, 0) +
+      ' deg/s: fast retraction overcorrects, and errors in apex height grow with alternating sign.' :
+      'lambda stays above -1 at every tested rate.');
+    var fr = rules.filter(function (r) { return r.rule === 'fastestRecovery'; })[0];
+    if (fr) parts.push(fr.note ? 'Fastest recovery: ' + fr.note + ', so this rule uses no retraction (lambda ' + fmt(fr.lambda, 2) + ').' :
+      'Fastest recovery needs ' + fmt(fr.retractionDegPerS, 1) + ' deg/s here, where lambda reaches 0.');
+    var hr = rules.filter(function (r) { return r.rule === 'commonPerCycle'; })[0];
+    var gr = rules.filter(function (r) { return r.rule === 'groundSpeedMatching'; })[0];
+    if (hr && h4) {
+      var within = function (v, m, sd) { return Math.abs(v - m) <= sd; };
+      var tx = 'At the human rate (' + fmt(hr.retractionDegPerS, 1) + ' deg/s), the model has ground speed matching of ' + fmt(hr.groundSpeedMatching * 100, 0) +
+        ' % and an NMD estimate of ' + nmdText(hr.nmdEstimate, 'estimate', 2) + ', against ' + h4.groundSpeedMatching_pct + ' +/- ' + h4.groundSpeedMatchingSD_pct +
+        ' % and ' + fmt(h4.nmd, 2) + ' +/- ' + fmt(h4.nmdSD, 2) + ' measured in humans at ' + fmt(h4.speed_mps, 2) + ' m/s (Blum et al. 2011)';
+      var bothWithin = within(hr.groundSpeedMatching * 100, h4.groundSpeedMatching_pct, h4.groundSpeedMatchingSD_pct) && within(hr.nmdEstimate, h4.nmd, h4.nmdSD);
+      tx += bothWithin ? ', both within one standard deviation of the measured means.' : '.';
+      if (fr && gr && hr.retractionDegPerS > fr.retractionDegPerS && hr.retractionDegPerS < gr.retractionDegPerS) {
+        tx += ' The human rate lies between the rates for fastest recovery and for ground speed matching, with lambda = ' + fmt(hr.lambda, 2) + '.';
+      }
+      parts.push(tx);
+    }
+    var box = $('retrText');
+    box.innerHTML = '';
+    parts.forEach(function (x) { box.appendChild(el('p', null, x)); });
+  }
+
+  function renderSwingTable(D) {
+    $('swingLegNote').textContent = 'Source: ' + REF.data.swingLegSource + '. The scaled column divides each rate per gait cycle by this gait\'s cycle of ' +
+      fmt(D.cycle, 3) + ' s, so all rates compare over one gait cycle of the model.';
+    var html = '<thead><tr>' + ['Species', 'Speed (m/s)', 'Froude number', 'Leg length (m)', 'Gait cycle (s)', 'Touchdown angle (deg)',
+      'Leg rotation (deg per gait cycle)', 'Scaled to this gait (deg/s)', 'Leg length change (L0 per gait cycle)', 'Ground speed matching (%)', 'NMD']
+      .map(function (h) { return '<th scope="col">' + h + '</th>'; }).join('') + '</tr></thead><tbody>';
+    var pm = function (m, sd, d) { return m === null || m === undefined ? 'n/a' : fmt(m, d) + (sd === null || sd === undefined ? '' : ' +/- ' + fmt(sd, d)); };
+    SWING.forEach(function (r) {
+      html += '<tr><td>' + r.species + '</td><td>' + fmt(r.speed_mps, 2) + '</td><td>' + fmt(r.froude, 2) + '</td><td>' + fmt(r.legLength_m, 2) +
+        '</td><td>' + fmt(r.gaitCycle_s, 2) + '</td><td>' + fmt(r.touchdownAngle_deg, 1) + '</td><td>' + pm(r.legRotation_degPerCycle, r.legRotationSD_degPerCycle, 1) +
+        '</td><td>' + fmt(r.legRotation_degPerCycle / D.cycle, 1) + '</td><td>' + fmt(r.legLengthChange_L0PerCycle, 2) + '</td><td>' +
+        pm(r.groundSpeedMatching_pct, r.groundSpeedMatchingSD_pct, 0) + '</td><td>' + pm(r.nmd, r.nmdSD, 2) + '</td></tr>';
+    });
+    $('swingLegTable').innerHTML = html + '</tbody>';
+  }
+
+  function loadRule(D, r) {
+    var st = D.source === 'matlab' ? presetState(D.presetName) : { p: Object.assign({}, D.base.p), apex: Object.assign({}, D.base.apex) };
+    if (D.source === 'matlab') S.presetName = D.presetName;
+    S.p = st.p;
+    S.apex = st.apex;
+    S.p.legAngleDeg = r.apexLegAngleDeg;
+    S.p.retractionDegPerS = r.retractionDegPerS;
+    var sel = $('presetSelect');
+    if (sel) sel.value = S.presetName;
+    syncControls();
+    recomputeSlip();
+    updateStatus('Loaded rule "' + r.name + '": retraction ' + fmt(r.retractionDegPerS, 1) + ' deg/s, leg angle at apex ' + fmt(r.apexLegAngleDeg, 2) + ' deg.', true);
+  }
+
+  async function recomputeRetraction() {
+    if (!S.periodic) {
+      updateStatus('The current apex state is not periodic. Press Find periodic gait or load a preset first.', true);
+      return;
+    }
+    var btn = $('retrRecompute'), prog = $('retrProgress');
+    btn.disabled = true;
+    prog.hidden = false;
+    prog.value = 0;
+    var p = Object.assign({}, S.p), apex = Object.assign({}, S.apex);
+    var omegas = SlipSim.range(0, 250, 5);
+    var total = RULES.length + omegas.length, done = 0;
+    var rules = [], sweep = [];
+    try {
+      for (var i = 0; i < RULES.length; i++) {
+        rules = rules.concat(SlipSim.compareRetractionRules(p, apex, [RULES[i]], { dropHeight: 0.05, terrain: true }));
+        prog.value = ++done / total;
+        await pause();
+      }
+      for (var j = 0; j < omegas.length; j++) {
+        sweep = sweep.concat(SlipSim.retractionSweep(p, apex, [omegas[j]], { dropHeight: 0.05 }));
+        prog.value = ++done / total;
+        if (j % 3 === 2) await pause();
+      }
+    } catch (e) {
+      prog.hidden = true;
+      btn.disabled = false;
+      updateStatus('The comparison could not be computed: ' + e.message, true);
+      return;
+    }
+    prog.hidden = true;
+    btn.disabled = false;
+    S.retr = { source: 'browser', label: 'Current', base: { p: p, apex: apex }, rules: rules, sweep: sweep, dropHeight: 0.05,
+      cycle: 2 / S.M.stepFrequency, k: p.k, speed: S.M.meanSpeed };
+    renderRetraction();
+    updateStatus('Retraction rules recomputed for the current gait.', true);
   }
 
   /* ----- Perturbation tab ----- */
@@ -1535,17 +1802,19 @@
       preset: function (n) { return preset(n); },
       fam: st,
       f: fmt,
-      clearance: REF.slip.family.footClearance,
-      referenceRate: REF_RETRACTION,
-      fixedClearance: function (n) {
-        var pr = preset(n);
-        return pr.apexHeight - pr.L0 * Math.sin(pr.touchdownAngleDeg * DEG);
+      retraction: REF.slip.family.retraction,
+      human4: humanRowFor(REF.slip.family.retraction.value),
+      swing: SWING,
+      rulesDrop: asArray(REF.slip.retractionByPreset)[0].dropHeight,
+      rules: function (n) {
+        var e = asArray(REF.slip.retractionByPreset).filter(function (x) { return x.name === n; })[0];
+        var out = {};
+        asArray(e.rules).forEach(function (r) { out[r.rule] = r; });
+        return out;
       },
-      fallTime: memo(function (n) {
-        var st = presetState(n);
-        var td = SlipSim.simulateStride(st.p, st.apex).events.filter(function (e) { return e.guard === 'touchdown'; })[0];
-        return td ? td.time : NaN;
-      }),
+      sweep: function (n) {
+        return asArray(asArray(REF.slip.retractionByPreset).filter(function (x) { return x.name === n; })[0].sweep);
+      },
       fixedLambda: memo(function (n) { var st = fixedPresetState(n); return SlipSim.lambda(st.p, st.apex); }),
       drop: memo(function (n) { return dropInfo(presetState(n)); }),
       fixedDrop: memo(function (n) { return dropInfo(fixedPresetState(n)); })
@@ -1647,6 +1916,8 @@
   /* ===================== References and about ===================== */
   var REFERENCES = [
     ['Blickhan R (1989) The spring-mass model for running and hopping. J Biomech 22:1217-1227.', '10.1016/0021-9290(89)90224-8'],
+    ['Blum Y, Lipfert SW, Rummel J, Seyfarth A (2010) Swing leg control in human running. Bioinspir Biomim 5:026006.', '10.1088/1748-3182/5/2/026006'],
+    ['Blum Y, Birn-Jeffery A, Daley MA, Seyfarth A (2011) Does a crouched leg posture enhance running stability and robustness? J Theor Biol 281:97-106.', '10.1016/j.jtbi.2011.04.029'],
     ['Blum Y, Vejdani HR, Birn-Jeffery AV, Hubicki CM, Hurst JW, Daley MA (2014) Swing-leg trajectory of running guinea fowl suggests task-level priority of force regulation rather than disturbance rejection. PLoS One 9:e100399.', '10.1371/journal.pone.0100399'],
     ['Daley MA, Biewener AA (2006) Running over rough terrain reveals limb control for intrinsic stability. Proc Natl Acad Sci USA 103:15681-15686.', '10.1073/pnas.0601473103'],
     ['Daley MA, Usherwood JR (2010) Two explanations for the compliant running paradox: reduced work of bouncing viscera and increased stability in uneven terrain. Biol Lett 6:418-421.', '10.1098/rsbl.2010.0175'],
@@ -1654,7 +1925,8 @@
     ['Kram R, Taylor CR (1990) Energetics of running: a new perspective. Nature 346:265-267.', '10.1038/346265a0'],
     ['McMahon TA, Cheng GC (1990) The mechanics of running: how does stiffness couple with speed? J Biomech 23 Suppl 1:65-78.', '10.1016/0021-9290(90)90042-2'],
     ['Seyfarth A, Geyer H, Guenther M, Blickhan R (2002) A movement criterion for running. J Biomech 35:649-655. PMID 11955504.', null],
-    ['Seyfarth A, Geyer H, Herr H (2003) Swing-leg retraction: a simple control model for stable running. J Exp Biol 206:2547-2555.', '10.1242/jeb.00463']
+    ['Seyfarth A, Geyer H, Herr H (2003) Swing-leg retraction: a simple control model for stable running. J Exp Biol 206:2547-2555.', '10.1242/jeb.00463'],
+    ['Vejdani HR, Blum Y, Daley MA, Hurst JW (2013) Bio-inspired swing leg control for spring-mass robots running on ground with unexpected height disturbance. Bioinspir Biomim 8:046006.', '10.1088/1748-3182/8/4/046006']
   ];
 
   function buildFooter() {
@@ -1704,8 +1976,20 @@
     csn.addEventListener('change', function () { setCob(parseFloat(csn.value) || 0); });
 
     // Family
-    $('familyClearance').value = REF.slip.family.footClearance;
+    var FR_DEFAULT = { commonPerCycle: REF.slip.family.retraction.value, common: REF.slip.family.retraction.degPerS, clearance: 0.05 };
+    var syncFamilyRule = function () {
+      var r = $('familyRule').value;
+      var need = ruleNeedsValue(r);
+      $('familyRuleValue').hidden = !need;
+      $('familyRuleValueLabel').hidden = !need;
+      $('familyRuleValueLabel').textContent = 'Value (' + (RULE_UNITS[r] || '') + ')';
+      if (need) $('familyRuleValue').value = round(FR_DEFAULT[r], 2);
+    };
+    $('familyRule').addEventListener('change', syncFamilyRule);
+    syncFamilyRule();
     $('nmdBtn').addEventListener('click', computeNmd);
+    $('retrRecompute').addEventListener('click', recomputeRetraction);
+    $('retrRestore').addEventListener('click', function () { S.retr = null; renderRetraction(); });
     $('familyRecompute').addEventListener('click', recomputeFamily);
     $('familyRestore').addEventListener('click', function () {
       S.family = { rows: MATLAB_FAMILY, source: 'matlab' };

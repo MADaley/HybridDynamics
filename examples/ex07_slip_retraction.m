@@ -1,63 +1,75 @@
-%% EX07_SLIP_RETRACTION  Swing-leg retraction and stride-to-stride stability
-% Purpose : rotate the leg rearward during the descending flight phase and
-%           see how the retraction rate changes the leg angle at apex, the
-%           foot clearance at apex and the eigenvalue of the apex return
-%           map, at the same average speed and step frequency.
+%% EX07_SLIP_RETRACTION  Choosing a swing-leg retraction rate
+% Purpose : give one periodic gait different swing-leg retraction rates,
+%           chosen by different rules, and compare foot clearance, ground
+%           speed matching, stride-to-stride stability, the normalized
+%           maximum drop and the peak leg force after a drop. Compare the
+%           rates with the leg rotation measured in running humans and
+%           pheasants (Blum et al. 2011).
 % Model   : models/slip
-% Outputs : table and figure on screen
+% Outputs : rule table and figure on screen
 % Requires: none (the script adds the toolkit to the path)
 
 clear; close all;
 run(fullfile(fileparts(mfilename('fullpath')), '..', 'setupHybridDynamics.m'));
 
-%% ===== USER SETTINGS: starting gait =====
-[p, apex, ~, presets] = slip_defaults("human");
+%% ===== USER SETTINGS: gait =====
+presetName = "human";             % "human", "humanLowStiffness", "humanHighStiffness"
+[p, apex] = slip_defaults(presetName);
 
-%% ===== USER SETTINGS: contact conditions to compare =====
-retractionRates = 0:20:200;       % leg rotation rates in descending flight (deg/s)
+%% ===== USER SETTINGS: rules and tests =====
+rules      = slip_defaultRetractionRules();   % {name, rule, value}
+omegas     = 0:10:250;                        % rates for the sweep (deg/s)
+dropHeight = 0.05;                            % drop for the peak-force test (m)
 
-%% ===== USER SETTINGS: gait held fixed =====
-target.meanSpeed     = presets.meanSpeed(presets.name == "human");
-target.hold          = "stepFrequency";
-target.stepFrequency = presets.stepFrequency(presets.name == "human");
+%% 1. Compare the rules (every rule keeps the same periodic gait)
+T = slip_compareRetractionRules(p, apex, rules, struct('dropHeight', dropHeight));
+disp(T(:, ["name" "retractionDegPerS" "retractionDegPerCycle" "apexClearance" ...
+    "groundSpeedMatching" "lambda" "maxDrop" "nmdEstimate" "peakForceAfterDropBW"]));
 
-%% 1. Solve the periodic gait for each retraction rate (continuation)
-n = numel(retractionRates);
-lambda = nan(n, 1); apexAngle = nan(n, 1); tdAngle = nan(n, 1); Fv = nan(n, 1);
-clearance = nan(n, 1);
-tdAngle0 = presets.touchdownAngleDeg(presets.name == "human");
-guess = struct('y', apex.y, 'vx', apex.vx, 'legAngleDeg', tdAngle0);
-for i = 1:n
-    q = p;
-    q.retractionDegPerS = retractionRates(i);
-    [g, info] = slip_findGait(q, target, guess);
-    if ~info.converged, continue, end
-    guess = struct('y', g.y, 'vx', g.vx, 'legAngleDeg', g.p.legAngleDeg);
-    S = slip_stability(g.p, [g.y; g.vx], struct('jacobian', false, 'terrain', false));
-    M = slip_metrics(g.p, [g.y; g.vx]);
-    lambda(i) = S.lambda;
-    apexAngle(i) = g.p.legAngleDeg;
-    tdAngle(i) = M.touchdownAngleDeg;
-    Fv(i) = M.peakVerticalForceBW;
-    clearance(i) = g.y - g.p.L0 * sind(g.p.legAngleDeg);
-end
-T = table(retractionRates(:), apexAngle, tdAngle, 100 * clearance, Fv, lambda, 'VariableNames', ...
-    {'retractionDegPerS', 'apexLegAngleDeg', 'touchdownAngleDeg', 'apexClearanceCm', ...
-    'peakVerticalForceBW', 'lambda'});
-disp(T);
+%% 2. Sweep the retraction rate
+W = slip_retractionSweep(p, apex, omegas, struct('dropHeight', dropHeight));
 
-%% 2. Plot
+%% 3. Measured leg rotation in running humans and pheasants (deg per gait cycle)
+D = readtable(fullfile(fileparts(mfilename('fullpath')), '..', 'data', ...
+    'swingLegKinematics_Blum2011.csv'), 'TextType', 'string');
+cycle = T.retractionDegPerCycle(2) / T.retractionDegPerS(2);   % gait cycle of this gait (s)
+humanRate = D.legRotation_degPerCycle(D.species == "human") / cycle;     % deg/s at this cycle
+birdRate  = D.legRotation_degPerCycle(D.species == "pheasant") / cycle;
+
+%% 4. Plot measures against retraction rate, with the rules marked
 St = daleyStyle('teaching');
-f = St.figure('onehalf', 2);
-tl = tiledlayout(f, 2, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
-ax = nexttile(tl); hold(ax, 'on');
-a = St.series(1); plot(ax, T.retractionDegPerS, T.touchdownAngleDeg, a{:});
-b = St.series(2); plot(ax, T.retractionDegPerS, T.apexLegAngleDeg, b{:});
-legend(ax, ["at touchdown", "at apex"], 'Box', 'off', 'Location', 'best');
-ylabel(ax, 'Leg angle (deg)');
-St.apply(ax);
-ax = nexttile(tl); hold(ax, 'on');
-yline(ax, [-1 0 1], ':', 'Color', St.col.grey, 'LineWidth', St.reflinewidth);
-plot(ax, T.retractionDegPerS, T.lambda, a{:});
-xlabel(ax, 'Retraction rate (deg/s)'); ylabel(ax, 'Eigenvalue \lambda');
-St.apply(ax);
+f = St.figure('double', 2);
+set(f, 'Position', [1 1 12 7], 'PaperSize', [12 7], 'PaperPosition', [0 0 12 7]);
+tl = tiledlayout(f, 2, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
+panels = {"apexClearance", 100, "Foot clearance at apex (cm)"
+          "groundSpeedMatching", 100, "Ground speed matching (%)"
+          "lambda", 1, "Eigenvalue \lambda"
+          "nmdEstimate", 1, "NMD estimate"
+          "peakForceAfterDropBW", 1, sprintf("Peak force after %.0f cm drop (BW)", 100 * dropHeight)
+          "nmdSimulated", 1, "Simulated first-contact limit"};
+for i = 1:size(panels, 1)
+    ax = nexttile(tl); hold(ax, 'on');
+    y = W.(panels{i, 1}) * panels{i, 2};
+    y(~isfinite(y)) = NaN;
+    % Shaded spans: measured human and pheasant rates (deg/T converted to deg/s)
+    yl = [min(y, [], 'omitnan'), max(y, [], 'omitnan')];
+    if panels{i, 1} == "lambda", yl = [-1.5 1]; yline(ax, [-1 0 1], ':', 'Color', St.col.grey, 'LineWidth', St.reflinewidth); end
+    if startsWith(panels{i, 1}, "nmd"), yl = [0 3]; end
+    patch(ax, [min(humanRate) max(humanRate) max(humanRate) min(humanRate)], yl([1 1 2 2]), ...
+        St.col.lightgrey, 'EdgeColor', 'none', 'FaceAlpha', 0.6, 'HandleVisibility', 'off');
+    a = St.series(1); a{end} = 1.25;
+    plot(ax, W.retractionDegPerS, y, a{:}, 'HandleVisibility', 'off');
+    for r = 2:height(T)
+        b = St.points(r);
+        yr = T.(panels{i, 1})(r) * panels{i, 2};
+        if isfinite(yr), plot(ax, T.retractionDegPerS(r), yr, b{:}, 'DisplayName', T.name(r)); end
+    end
+    ylim(ax, yl);
+    xlabel(ax, 'Retraction rate (deg/s)'); ylabel(ax, panels{i, 3});
+    St.apply(ax);
+    if i == 1, legend(ax, 'Box', 'off', 'Location', 'northwest', 'FontSize', 9); end
+end
+title(tl, sprintf('%s; grey span: human leg rotation 2 to 4 m/s (Blum et al. 2011)', presetName), ...
+    'FontName', St.font, 'Color', St.ink, 'FontSize', 12);
+fprintf('Human leg rotation (2 to 4 m/s): %.0f to %.0f deg/s at this gait cycle; pheasant: %.0f to %.0f deg/s.\n', ...
+    min(humanRate), max(humanRate), min(birdRate), max(birdRate));

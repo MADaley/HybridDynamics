@@ -457,6 +457,12 @@
     M.peakElasticEnergy = 0.5 * p.k * compression * compression;
     M.positiveWorkPerDistance = M.peakElasticEnergy / (p.m * M.stepLength);
     M.forceTimeCostIndex = 1 / M.contactTime;
+    {
+      const a = M.touchdownAngleDeg * DEG, v = [ev.touchdown.x[2], ev.touchdown.x[3]];
+      const w = p.retractionDegPerS * DEG;
+      const vf = [v[0] - p.L0 * w * Math.sin(a), v[1] - p.L0 * w * Math.cos(a)];
+      M.groundSpeedMatching = 1 - Math.hypot(vf[0], vf[1]) / Math.hypot(v[0], v[1]);
+    }
     M.froude = M.meanSpeed * M.meanSpeed / (p.g * p.L0);
     M.relativeStiffness = p.k * p.L0 / W;
     // Energy components and the conservation check.
@@ -567,6 +573,147 @@
 
   function apexClearance(p, apex) {
     return apex.y - p.L0 * Math.sin(p.legAngleDeg * DEG);
+  }
+
+  /* ===================== Retraction rules ===================== */
+  // setRetraction(p, apex, omegaDegPerS), as slip_setRetraction.m: the leg
+  // angle at apex is set so the leg reaches the same touchdown angle at the
+  // same time; the periodic gait is unchanged.
+  function setRetraction(p, apex, omegaDegPerS) {
+    if (omegaDegPerS < 0) throw new Error('The retraction rate must be zero or positive.');
+    const td = touchdownOf(p, apex);
+    const q = Object.assign({}, p, {
+      retractionDegPerS: omegaDegPerS,
+      legAngleDeg: td.angle / DEG - omegaDegPerS * td.time
+    });
+    if (q.legAngleDeg <= 0) throw new Error('This rate would need a leg angle at apex below the horizontal.');
+    return q;
+  }
+
+  // Ground speed matching at touchdown, GSM = 1 - |v_foot| / |v_CoM|
+  // (Blum et al. 2010), as slip_groundSpeedMatching.m.
+  function groundSpeedMatching(p, apex) {
+    const r = simulateStride(p, apexState(p, apex.y, apex.vx));
+    const e = r.events[0];
+    if (!e || e.guard !== 'touchdown') throw new Error('No touchdown in the first flight.');
+    const x = e.x, a = legAngleDeg(x) * DEG;
+    const v = [x[2], x[3]], u = [-Math.sin(a), -Math.cos(a)];
+    const w = p.retractionDegPerS * DEG;
+    const vf = [v[0] + p.L0 * w * u[0], v[1] + p.L0 * w * u[1]];
+    const nv = Math.hypot(v[0], v[1]);
+    const wStar = Math.max(-(v[0] * u[0] + v[1] * u[1]) / p.L0, 0);
+    const vfs = [v[0] + p.L0 * wStar * u[0], v[1] + p.L0 * wStar * u[1]];
+    return { gsm: 1 - Math.hypot(vf[0], vf[1]) / nv, footSpeed: Math.hypot(vf[0], vf[1]),
+      touchdownAngleDeg: a / DEG, omegaMaxGsmDegPerS: wStar / DEG,
+      gsmMax: 1 - Math.hypot(vfs[0], vfs[1]) / nv };
+  }
+
+  function gaitCycle(p, apex) {
+    return 2 * returnMap(p, apex).period;
+  }
+
+  /*
+   * retractionRule(p, apex, rule, value), as slip_retractionRule.m. Rules:
+   * 'fixed', 'common' (deg/s), 'commonPerCycle' (deg per gait cycle),
+   * 'clearance' (m), 'fastestRecovery', 'groundSpeedMatching'.
+   * Returns {p, rule, retractionDegPerS, retractionDegPerCycle,
+   * apexClearance, gsm, lambda, note}.
+   */
+  function retractionRule(p, apex, rule, value) {
+    let omega = 0, note = '';
+    if (rule === 'fixed') {
+      omega = 0;
+    } else if (rule === 'common') {
+      omega = value;
+    } else if (rule === 'commonPerCycle') {
+      omega = value / gaitCycle(p, apex);
+    } else if (rule === 'clearance') {
+      omega = retractionForClearance(p, apex, value).p.retractionDegPerS;
+    } else if (rule === 'groundSpeedMatching') {
+      omega = groundSpeedMatching(setRetraction(p, apex, 0), apex).omegaMaxGsmDegPerS;
+    } else if (rule === 'fastestRecovery') {
+      const lam = function (w) { return lambda(setRetraction(p, apex, w), apex); };
+      if (lam(0) <= 0) {
+        omega = 0;
+        note = 'lambda is already negative with no retraction; retraction moves it further from zero';
+      } else {
+        let lo = 0, hi = 20;
+        while (lam(hi) > 0 && hi < 2000) { lo = hi; hi *= 2; }
+        while (hi - lo > 1e-6) {
+          const mid = 0.5 * (lo + hi);
+          if (lam(mid) > 0) lo = mid; else hi = mid;
+        }
+        omega = 0.5 * (lo + hi);
+      }
+    } else {
+      throw new Error('Unknown rule ' + rule);
+    }
+    const q = setRetraction(p, apex, omega);
+    return { p: q, rule: rule, retractionDegPerS: omega,
+      retractionDegPerCycle: omega * gaitCycle(p, apex),
+      apexClearance: apexClearance(q, apex), gsm: groundSpeedMatching(q, apex).gsm,
+      lambda: lambda(q, apex), note: note };
+  }
+
+  // First stance after an unexpected drop: contact and peak leg force (BW),
+  // as slip_dropResponse.m.
+  function peakLegForce(p, y, vx) {
+    const r = simulateStride(p, apexState(p, y, vx), { trace: true, traceDt: 1e-4 });
+    const td = r.events.find(function (e) { return e.guard === 'touchdown'; });
+    const contact = !!td && td.to === 'stance';
+    let F = NaN;
+    if (contact) {
+      // Exact minimum leg length found by the stance integrator.
+      F = p.k * (p.L0 - r.minLegLength) / (p.m * p.g);
+    }
+    return { peakLegForceBW: F, contact: contact, outcome: r.reason,
+      touchdownAngleDeg: td ? legAngleDeg(td.x) : NaN };
+  }
+
+  function dropResponse(p, apex, dropHeight) {
+    const s = peakLegForce(p, apex.y, apex.vx);
+    const d = peakLegForce(p, apex.y + dropHeight, apex.vx);
+    return Object.assign(d, { peakLegForceBWsteady: s.peakLegForceBW });
+  }
+
+  /*
+   * compareRetractionRules(p, apex, rules, opts), as
+   * slip_compareRetractionRules.m. rules: [{name, rule, value}].
+   * opts: {dropHeight: 0.05, terrain: true}
+   */
+  function compareRetractionRules(p, apex, rules, opts) {
+    opts = Object.assign({ dropHeight: 0.05, terrain: true }, opts || {});
+    return rules.map(function (r) {
+      const info = retractionRule(p, apex, r.rule, r.value);
+      const q = info.p;
+      const D = normalizedMaxDrop(q, apex);
+      const R = dropResponse(q, apex, opts.dropHeight);
+      const row = { name: r.name, rule: r.rule, retractionDegPerS: info.retractionDegPerS,
+        retractionDegPerCycle: info.retractionDegPerCycle, apexLegAngleDeg: q.legAngleDeg,
+        apexClearance: info.apexClearance, groundSpeedMatching: info.gsm, lambda: info.lambda,
+        maxDrop: NaN, dropFailure: '', nmdEstimate: D.estimateNMD, nmdSimulated: D.simulatedNMD,
+        peakForceAfterDropBW: R.peakLegForceBW, peakForceSteadyBW: R.peakLegForceBWsteady,
+        note: info.note };
+      if (opts.terrain) {
+        const d = dropTest(q, apex, range(0.01, 0.50, 0.01), 20);
+        row.maxDrop = d.maxDrop; row.dropFailure = d.dropFailure;
+      }
+      return row;
+    });
+  }
+
+  // retractionSweep(p, apex, omegas, opts), as slip_retractionSweep.m.
+  function retractionSweep(p, apex, omegas, opts) {
+    opts = Object.assign({ dropHeight: 0.05 }, opts || {});
+    const cycle = gaitCycle(p, apex);
+    return omegas.map(function (w) {
+      const q = setRetraction(p, apex, w);
+      const D = normalizedMaxDrop(q, apex);
+      return { retractionDegPerS: w, retractionDegPerCycle: w * cycle,
+        apexClearance: apexClearance(q, apex), groundSpeedMatching: groundSpeedMatching(q, apex).gsm,
+        lambda: lambda(q, apex), nmdEstimate: D.estimateNMD, nmdSimulated: D.simulatedNMD,
+        peakForceAfterDropBW: dropResponse(q, apex, opts.dropHeight).peakLegForceBW };
+    });
   }
 
   /* ===================== Normalized maximum drop ===================== */
@@ -756,6 +903,8 @@
     row.apexHeight = g.y;
     row.apexSpeed = g.vx;
     row.retractionDegPerS = g.p.retractionDegPerS;
+    row.retractionDegPerCycle = g.p.retractionDegPerS * 2 * M.period;
+    row.groundSpeedMatching = M.groundSpeedMatching;
     row.apexClearance = apexClearance(g.p, { y: g.y, vx: g.vx });
     row.lambda = lambda(g.p, { y: g.y, vx: g.vx });
     if (opts.drop) {
@@ -774,7 +923,8 @@
 
   async function stiffnessFamily(base, kValues, target, opts) {
     opts = Object.assign({ drop: false, heights: range(0.01, 0.50, 0.01), nStrides: 20,
-      footClearance: NaN, referenceRetractionDegPerS: base.p.retractionDegPerS }, opts || {});
+      footClearance: NaN, retractionRule: 'fixed', retractionValue: NaN,
+      referenceRetractionDegPerS: base.p.retractionDegPerS }, opts || {});
     // Solve the gaits with a fixed leg angle; retraction leaves them unchanged.
     if (base.p.retractionDegPerS !== 0) {
       const td = touchdownOf(base.p, { y: base.y, vx: base.vx });
@@ -818,14 +968,17 @@
         await tick();
       }
     }
-    // Add swing-leg retraction where the foot clearance at apex is too small.
-    if (isFinite(opts.footClearance)) {
-      gaits.forEach(function (g, i) {
-        if (g && apexClearance(g.p, g) < opts.footClearance) {
+    // Add swing-leg retraction: a minimum foot clearance, or a rule.
+    gaits.forEach(function (g, i) {
+      if (!g) return;
+      if (isFinite(opts.footClearance)) {
+        if (apexClearance(g.p, g) < opts.footClearance) {
           gaits[i] = Object.assign({}, g, { p: retractionForClearance(g.p, g, opts.footClearance).p });
         }
-      });
-    }
+      } else if (opts.retractionRule !== 'fixed') {
+        gaits[i] = Object.assign({}, g, { p: retractionRule(g.p, g, opts.retractionRule, opts.retractionValue).p });
+      }
+    });
     const rows = [];
     for (let i = 0; i < n; i++) {
       rows.push(familyRow(kValues[i], gaits[i], opts));
@@ -914,6 +1067,12 @@
     stridesSurvivedInfo: stridesSurvivedInfo,
     retractionForClearance: retractionForClearance,
     normalizedMaxDrop: normalizedMaxDrop,
+    setRetraction: setRetraction,
+    groundSpeedMatching: groundSpeedMatching,
+    retractionRule: retractionRule,
+    dropResponse: dropResponse,
+    compareRetractionRules: compareRetractionRules,
+    retractionSweep: retractionSweep,
     apexClearance: apexClearance,
     dropTest: dropTest,
     newtonSolve: newtonSolve,

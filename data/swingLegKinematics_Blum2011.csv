@@ -1,0 +1,7 @@
+species,legLength_m,froude,speed_mps,gaitCycle_s,touchdownAngle_deg,legRotation_degPerCycle,legRotationSD_degPerCycle,legLengthChange_L0PerCycle,groundSpeedMatching_pct,groundSpeedMatchingSD_pct,nmd,nmdSD
+human,1.02,0.42,2.06,0.78,78.1,35.6,9.5,-0.14,34,6,0.48,0.18
+human,1.02,0.94,3.07,0.75,73.8,57.3,13.2,-0.22,39,7,0.35,0.12
+human,1.02,1.66,4.07,0.70,70.7,82.2,19.7,-0.28,43,8,0.25,0.07
+pheasant,0.21,2.32,2.22,0.35,57.0,93.9,14.4,0.95,,,,
+pheasant,0.21,3.06,2.54,0.33,57.6,113.2,20.0,0.75,,,,
+pheasant,0.21,3.68,2.77,0.31,57.0,132.4,4.3,0.49,,,,

@@ -16,7 +16,9 @@
  *   xLabel, yLabel, title, xLim [a, b], yLim [a, b], square (bool)
  *   series : [{x, y, label, style (0-3), points (bool), color (CSS)}]
  *   refs   : [{y: v} | {x: v} | {identity: true}]
- *   shade  : [{x0, x1}]
+ *   shade  : [{x0, x1, label}]  light grey spans; label is written at the top
+ *   labels : [{x, y, text, color, dx, dy, align}]  text placed beside a point
+ *   whiskers : [{x, y, lo, hi, label}]  a point with thin vertical whiskers
  *   legend : 'tl' | 'tr' | 'bl' | 'br' | 'outside' (right of the axes) | null
  *   heat   : {x0, x1, y0, y1, nx, ny, values (row-major, ny rows), vmin, vmax}
  *   marks  : [{x, y}] open circles for a current setting
@@ -152,7 +154,18 @@ var Plot = (function () {
     (panel.shade || []).forEach(function (s) {
       ctx.fillStyle = C.shade;
       var a = Math.max(sx(s.x0), plot.x), b = Math.min(sx(s.x1), plot.x + plot.w);
-      if (b > a) ctx.fillRect(a, plot.y, b - a, plot.h);
+      if (b > a) {
+        ctx.fillRect(a, plot.y, b - a, plot.h);
+        if (s.label) {
+          ctx.save();
+          ctx.fillStyle = C.grey;
+          ctx.font = '11px ' + font;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillText(s.label, (a + b) / 2, plot.y + 2);
+          ctx.restore();
+        }
+      }
     });
 
     // Heat map cells
@@ -225,6 +238,40 @@ var Plot = (function () {
     });
     ctx.restore();
 
+    // Whiskers and direct labels are drawn outside the clip so that text
+    // near an edge stays readable.
+    // Data points with thin vertical whiskers (for example mean +/- SD)
+    (panel.whiskers || []).forEach(function (w) {
+      ctx.strokeStyle = C.ink;
+      ctx.fillStyle = C.ink;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(sx(w.x), sy(w.lo)); ctx.lineTo(sx(w.x), sy(w.hi));
+      ctx.moveTo(sx(w.x) - 4, sy(w.lo)); ctx.lineTo(sx(w.x) + 4, sy(w.lo));
+      ctx.moveTo(sx(w.x) - 4, sy(w.hi)); ctx.lineTo(sx(w.x) + 4, sy(w.hi));
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(sx(w.x), sy(w.y), 3.5, 0, 2 * Math.PI);
+      ctx.fill();
+      if (w.label) {
+        ctx.font = '11px ' + font;
+        ctx.textAlign = w.align || 'left';
+        ctx.textBaseline = 'middle';
+        haloText(ctx, w.label, sx(w.x) + (w.dx === undefined ? 7 : w.dx), sy(w.y) + (w.dy || 0), C);
+      }
+    });
+
+    // Direct labels beside points
+    (panel.labels || []).forEach(function (L) {
+      if (!isFinite(L.x) || !isFinite(L.y)) return;
+      ctx.fillStyle = L.color || C.text;
+      ctx.font = '11px ' + font;
+      ctx.textAlign = L.align || 'left';
+      ctx.textBaseline = 'middle';
+      haloText(ctx, L.text, sx(L.x) + (L.dx === undefined ? 6 : L.dx), sy(L.y) + (L.dy || 0), C);
+    });
+
+
     // Axes: left and bottom rulers, ticks out
     ctx.strokeStyle = C.ink;
     ctx.fillStyle = C.ink;
@@ -272,6 +319,17 @@ var Plot = (function () {
     }
     if (panel.legend) drawLegend(ctx, panel, plot, C, font);
     ctx.restore();
+  }
+
+  // Text with a thin outline in the panel color, so labels stay legible over lines.
+  function haloText(ctx, text, x, y, C) {
+    ctx.save();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = C.panel;
+    ctx.strokeText(text, x, y);
+    ctx.restore();
+    ctx.fillText(text, x, y);
   }
 
   function drawLegend(ctx, panel, plot, C, font) {

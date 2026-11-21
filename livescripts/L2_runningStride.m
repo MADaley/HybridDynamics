@@ -9,7 +9,7 @@ run(fullfile(here, '..', 'setupHybridDynamics.m'));
 fprintf('Leg stiffness %.0f N/m, relative stiffness %.1f\n', p.k, p.k * p.L0 / (p.m * p.g));
 fprintf('Leg angle at apex %.2f deg, retraction %.1f deg/s, foot clearance at apex %.1f cm\n', ...
     p.legAngleDeg, p.retractionDegPerS, 100 * (apex.y - p.L0 * sind(p.legAngleDeg)));
-%[text] The swing leg retracts (rotates rearward) from apex at a constant rate. At apex the foot is held 5 cm above the ground; the leg then reaches its touchdown angle as the body falls.
+%[text] The swing leg retracts (rotates rearward) from apex at a constant rate, the leg rotation rate measured at touchdown in humans running at 4 m/s (Blum et al. 2011). At apex the foot is held above the ground; the leg then reaches its touchdown angle as the body falls.
 %[text] ## 2. Simulate one stride
 M = slip_metrics(p, [apex.y; apex.vx]);
 M.trace.events(:, {'time', 'from', 'guard', 'to'})

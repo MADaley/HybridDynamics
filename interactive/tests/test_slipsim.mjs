@@ -82,7 +82,7 @@ for (const c of asArray(ref.slip.cases)) {
     retractionDegPerS: pr.retractionDegPerS }, y: pr.apexHeight, vx: pr.apexSpeed };
   const kValues = rowsRef.map(r => r.k);
   const rows = await Sim.stiffnessFamily(base, kValues, fam.target,
-    { drop: false, footClearance: fam.footClearance,
+    { drop: false, retractionRule: fam.retraction.rule, retractionValue: fam.retraction.value,
       referenceRetractionDegPerS: fam.referenceRetractionDegPerS });
   rows.forEach((r, i) => {
     check(`family k=${r.k}: solved`, r.ok);
@@ -97,6 +97,39 @@ for (const c of asArray(ref.slip.cases)) {
       close(`family k=${r.k}: lambda`, r.lambda, rowsRef[i].lambda, 1e-4);
     }
   });
+}
+
+// ----- Retraction rules and sweep for each preset -----
+{
+  const rules = asArray(ref.slip.retractionRules).map(r => ({ name: r.name, rule: r.rule, value: r.value }));
+  for (const rp of asArray(ref.slip.retractionByPreset)) {
+    const pr = asArray(ref.slip.presets).find(x => x.name === rp.name);
+    const p = { m: pr.m, L0: pr.L0, k: pr.k, g: pr.g, legAngleDeg: pr.legAngleDeg, retractionDegPerS: pr.retractionDegPerS };
+    const apex = { y: pr.apexHeight, vx: pr.apexSpeed };
+    const C = Sim.compareRetractionRules(p, apex, rules, { dropHeight: rp.dropHeight, terrain: true });
+    asArray(rp.rules).forEach((r, i) => {
+      const lab = `${rp.name} / ${r.name}`;
+      close(`${lab}: rate`, C[i].retractionDegPerS, r.retractionDegPerS, 1e-4);
+      close(`${lab}: rate per cycle`, C[i].retractionDegPerCycle, r.retractionDegPerCycle, 1e-4);
+      close(`${lab}: apex clearance`, C[i].apexClearance, r.apexClearance, 1e-7);
+      close(`${lab}: GSM`, C[i].groundSpeedMatching, r.groundSpeedMatching, 1e-6);
+      close(`${lab}: lambda`, C[i].lambda, r.lambda, 1e-4);
+      close(`${lab}: 20-stride drop`, C[i].maxDrop, r.maxDrop, 1e-9);
+      close(`${lab}: NMD estimate`, C[i].nmdEstimate, r.nmdEstimate, 1e-5, true);
+      close(`${lab}: NMD simulated`, C[i].nmdSimulated, r.nmdSimulated, 2e-4);
+      close(`${lab}: peak force after drop`, C[i].peakForceAfterDropBW, r.peakForceAfterDropBW, 1e-4, true);
+    });
+    const W = Sim.retractionSweep(p, apex, asArray(rp.sweep).map(r => r.retractionDegPerS), { dropHeight: rp.dropHeight });
+    asArray(rp.sweep).forEach((r, i) => {
+      const lab = `${rp.name} sweep ${r.retractionDegPerS} deg/s`;
+      // Relative tolerance: at fast retraction |lambda| > 1 and the map is steep.
+      close(`${lab}: lambda`, W[i].lambda, r.lambda, 5e-4, true);
+      close(`${lab}: GSM`, W[i].groundSpeedMatching, r.groundSpeedMatching, 1e-6);
+      close(`${lab}: NMD estimate`, W[i].nmdEstimate, r.nmdEstimate, 1e-5, true);
+      close(`${lab}: NMD simulated`, W[i].nmdSimulated, r.nmdSimulated, 2e-4);
+      close(`${lab}: peak force after drop`, W[i].peakForceAfterDropBW, r.peakForceAfterDropBW, 1e-4, true);
+    });
+  }
 }
 
 // ----- Retraction for a foot clearance -----

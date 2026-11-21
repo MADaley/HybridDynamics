@@ -15,8 +15,8 @@ function f = plotStiffnessFamily(T, highlight)
 %   stride-to-stride eigenvalue (lambda; the dotted lines at -1 and +1
 %   bound the stable range), the largest drop survived for 20 strides, and
 %   the normalized maximum drop of Daley and Usherwood (2010): the estimate
-%   at each gait's retraction rate, the estimate at one common rate, and
-%   the simulated first-contact limit (when the table has those columns).
+%   at each gait's retraction rate and the simulated first-contact limit
+%   (when the table has those columns).
 
 if nargin < 2, highlight = table(); end
 if height(highlight) > 0
@@ -67,10 +67,10 @@ end
 % Normalized maximum drop: three estimates of one quantity on one axis.
 if ismember('nmdEstimate', T.Properties.VariableNames)
     ax = nexttile(tl); hold(ax, 'on');
-    cols = ["nmdEstimate" "nmdEstimateAtReference" "nmdSimulated"];
-    names = ["estimate, own retraction", "estimate, common retraction", "simulated first contact"];
-    h = gobjects(1, 3);
-    for j = 1:3
+    cols = ["nmdEstimate" "nmdSimulated"];
+    names = ["estimate (Daley and Usherwood 2010)", "simulated first contact"];
+    h = gobjects(1, 2);
+    for j = 1:2
         y = T.(cols(j));
         y(~isfinite(y)) = NaN;          % beyond the search limit: left out
         a = S.series(j);

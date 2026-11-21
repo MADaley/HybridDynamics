@@ -8,12 +8,11 @@
  *   R.preset(name)  preset row (k, legAngleDeg, apexHeight, lambda, maxDrop, ...)
  *   R.fam           summary of the same-speed stiffness family (see app.js)
  *   R.f(v, d)       number formatted with d decimals
- *   R.clearance     minimum foot clearance at apex used by the presets (m)
- *   R.fixedClearance(name)  foot clearance at apex with a fixed leg angle (m)
- *   R.fallTime(name)        time from apex to touchdown (s)
+ *   R.retraction    common retraction of the presets {name, rule, value (deg per gait cycle), degPerS}
+ *   R.human4        measured human swing-leg row at the common rate (Blum et al. 2011)
+ *   R.swing         all measured swing-leg rows; R.rules(name), R.sweep(name) retraction comparison
  *   R.fixedLambda(name)     eigenvalue with a fixed leg angle
  *   R.drop(name), R.fixedDrop(name)  {maxDrop, first: {height, strides, failure}}
- *   R.referenceRate         common retraction rate for the NMD comparison (deg/s)
  *
  * Each lesson: id, title, model ('slip' | 'ball'), preset, settings
  * (overrides of slip parameters), tab, goal, body (paragraphs), tasks,
@@ -28,17 +27,36 @@ var HDS_LESSONS = {
     var F = R.fam;
     var f = R.f;
 
-    var edge = function (lam) { return Math.abs(lam) > 0.95 ? ', at the edge of stability' : ''; };
+    var edge = function (lam) { return Math.abs(lam) > 1 ? ', beyond the stability limit' : (Math.abs(lam) > 0.95 ? ', at the edge of stability' : ''); };
     var dropLimit = F.dropMaxValue >= 0.5 - 1e-9 ?
       'reaches the 50 cm limit of the test, first at ' + f(F.kDropMax, 0) + ' kN/m' :
       'reaches ' + f(F.dropMaxValue * 100, 0) + ' cm at ' + f(F.kDropMax, 0) + ' kN/m';
-    var refRate = R.referenceRate;
+    var RT = R.retraction, H4 = R.human4;
+    var rateText = f(RT.value, 1) + ' deg per gait cycle' + (H4 ? ', the human leg rotation rate at touchdown at ' + f(H4.speed_mps, 2) + ' m/s (Blum et al. 2011)' : '') +
+      ', or ' + f(RT.degPerS, 1) + ' deg/s for these gaits';
     var nmd = function (v) { return v === null || v === undefined || v === Infinity ? 'no limit' : f(v, 2); };
+    var dl = R.drop('humanLowStiffness'), dh = R.drop('human'), dhi = R.drop('humanHighStiffness');
+    var oneStride = [dl, dh, dhi].every(function (d) { return d.first && d.first.strides === 1; });
     var inc = function (a, b, c) { return a < b && b < c; };
-    var ownRises = inc(lo.nmdEstimate, h.nmdEstimate, hi.nmdEstimate);
-    var refFalls = inc(hi.nmdEstimateAtReference, h.nmdEstimateAtReference, lo.nmdEstimateAtReference);
     var simAbove = [lo, h, hi].every(function (g) { return g.nmdSimulated === null || g.nmdSimulated > g.nmdEstimate; });
     var farAbove = [lo, h, hi].every(function (g) { return g.nmdSimulated === null || g.nmdSimulated > 2 * g.maxDrop; });
+    var rh = R.rules('human'), rl = R.rules('humanLowStiffness');
+    var sweepH = R.sweep('human');
+    var overRate = null;
+    for (var si = 0; si < sweepH.length; si++) { if (sweepH[si].lambda < -1) { overRate = sweepH[si].retractionDegPerS; break; } }
+    var finite = function (v) { return v !== null && v !== undefined && isFinite(v); };
+    var tradeOff = finite(rh.fastestRecovery.nmdEstimate) && finite(rh.groundSpeedMatching.nmdEstimate) &&
+      rh.fastestRecovery.nmdEstimate > rh.groundSpeedMatching.nmdEstimate && rh.fastestRecovery.peakForceAfterDropBW > rh.groundSpeedMatching.peakForceAfterDropBW;
+    var humanBetween = rh.commonPerCycle.retractionDegPerS > rh.fastestRecovery.retractionDegPerS && rh.commonPerCycle.retractionDegPerS < rh.groundSpeedMatching.retractionDegPerS;
+    var humanClose = H4 && Math.abs(rh.commonPerCycle.groundSpeedMatching * 100 - H4.groundSpeedMatching_pct) <= H4.groundSpeedMatchingSD_pct &&
+      Math.abs(rh.commonPerCycle.nmdEstimate - H4.nmd) <= H4.nmdSD;
+    var rangeOf = function (species, field) {
+      var v = R.swing.filter(function (r) { return r.species === species; }).map(function (r) { return r[field]; });
+      return [Math.min.apply(null, v), Math.max.apply(null, v)];
+    };
+    var humLen = rangeOf('human', 'legLengthChange_L0PerCycle'), pheLen = rangeOf('pheasant', 'legLengthChange_L0PerCycle');
+    var humTd = rangeOf('human', 'touchdownAngle_deg'), pheTd = rangeOf('pheasant', 'touchdownAngle_deg');
+    var humRot = rangeOf('human', 'legRotation_degPerCycle'), pheRot = rangeOf('pheasant', 'legRotation_degPerCycle');
     var signText = F.crossings.length ? 'lambda is negative below about ' + f(F.crossings[0].k, 0) + ' kN/m, where errors change sign from stride to stride, and positive above it' :
       (F.lambdaMax < 0 ? 'lambda is negative for every gait, so errors change sign from stride to stride' : 'lambda is positive for every gait');
 
@@ -136,9 +154,11 @@ var HDS_LESSONS = {
           'At a given speed the model admits many periodic gaits. With the average speed held at ' + f(F.speed, 1) + ' m/s and the step frequency at ' + f(F.frequency, 1) + ' steps per second, each leg stiffness has its own touchdown angle, apex height and contact time. The Same speed tab follows this family from ' + f(F.kMin, 0) + ' to ' + f(F.kMax, 0) + ' kN/m.',
           'A stiffer leg lands at a steeper angle, compresses less and stays on the ground for a shorter time. The average vertical force over a stride equals body weight, so a shorter contact needs a higher peak force: ' + f(lo.peakVerticalForceBW, 2) + ' body weights at ' + f(lo.k / 1000, 0) + ' kN/m and ' + f(hi.peakVerticalForceBW, 2) + ' body weights at ' + f(hi.k / 1000, 0) + ' kN/m.',
           'The model does no net work over a stride, so any energy cost needs a proxy. The positive leg work per distance is the mechanical work by the legs if the spring returned no energy; it falls with stiffness, since a stiff leg stores less elastic energy. The force-time cost index, the inverse of contact time, follows the force-time hypothesis of Kram and Taylor (1990); it rises with stiffness. The two proxies rank the gaits in opposite order.',
-          'Every gait in the family uses swing-leg retraction where needed to keep the foot ' + f(R.clearance * 100, 0) + ' cm above the ground at apex (lesson 6). Retraction leaves each gait unchanged, so the forces and timing match the same gaits with a fixed leg angle; it changes only the stability.',
+          'Every gait in the family uses one swing-leg retraction rate, ' + rateText + '. Retraction leaves each gait unchanged, so the forces and timing match the same gaits with a fixed leg angle; it changes only the stability (lesson 6).',
           'Stability has two aspects here. The eigenvalue lambda measures how fast a small error decays; the drop test measures the largest unexpected drop in the ground that the gait survives for 20 strides. In this family ' + signText + '. lambda is most negative (' + f(F.lambdaMin, 2) + ') at ' + f(F.kLambdaMin, 0) + ' kN/m' + edge(F.lambdaMin) + ', and |lambda| is smallest near ' + f(F.kBest, 0) + ' kN/m. The largest drop survived ' + dropLimit + ', against ' + f(lo.maxDrop * 100, 0) + ' cm for the low-stiffness preset.',
-          'Daley and Usherwood (2010) proposed a second drop measure, the normalized maximum drop (NMD): the largest drop, in leg lengths, for which the leg still reaches the ground before rotating past vertical, so the first stance after the drop can take load (lesson 7). At one common retraction rate of ' + f(refRate, 1) + ' deg/s, the NMD estimate is ' + nmd(lo.nmdEstimateAtReference) + ' for the low-stiffness preset and ' + nmd(hi.nmdEstimateAtReference) + ' for the high-stiffness preset. The 20-stride drop test and NMD address different questions about stability, and the comparison table lists both.'
+          'Daley and Usherwood (2010) proposed a second drop measure, the normalized maximum drop (NMD): the largest drop, in leg lengths, for which the leg still reaches the ground before rotating past vertical, so the first stance after the drop can take load (lesson 7). At the common retraction rate the NMD estimate is ' + nmd(lo.nmdEstimate) + ' for the low-stiffness preset, ' + nmd(h.nmdEstimate) + ' for the baseline and ' + nmd(hi.nmdEstimate) + ' for the high-stiffness preset' +
+            (lo.nmdEstimate > h.nmdEstimate && h.nmdEstimate > hi.nmdEstimate ? ': the compliant leg, with the widest stance half-angle, has the largest NMD, the outcome Daley and Usherwood (2010) predicted.' : '.') +
+            ' The 20-stride drop test and NMD address different questions about stability, and the comparison table lists both.'
         ],
         tasks: [
           'Load the three presets in turn and compare contact time, peak force, retraction rate and lambda.',
@@ -150,24 +170,33 @@ var HDS_LESSONS = {
       },
       {
         id: 'retraction',
-        title: '6. Swing-leg retraction and foot clearance',
+        title: '6. Choosing a retraction rate',
         model: 'slip',
         preset: 'human',
-        tab: 'returnMap',
-        goal: 'See how rotating the leg rearward before touchdown lifts the foot at apex, leaves the gait unchanged, and changes stability.',
+        tab: 'retraction',
+        goal: 'Compare rules for the swing-leg retraction rate and the trade-offs among recovery, foot clearance, leg force and first contact.',
         body: [
-          'Running animals often rotate the swing leg rearward just before ground contact, and in the spring-mass model this retraction can stabilize running (Seyfarth et al. 2003). In the model the leg angle is set at apex and then rotates at the retraction rate during descending flight, so the touchdown angle depends on the time spent falling.',
-          'With a fixed leg angle the foot hangs low at apex: in the three presets it sits only ' + f(R.fixedClearance('humanLowStiffness') * 100, 1) + ', ' + f(R.fixedClearance('human') * 100, 1) + ' and ' + f(R.fixedClearance('humanHighStiffness') * 100, 1) + ' cm above the ground, so a small loss of apex height places the foot below the ground and ends the run. Retraction starts the leg at a shallower angle at apex, which lifts the foot to ' + f(R.clearance * 100, 0) + ' cm, and rotates it to the same touchdown angle at the same touchdown time. The periodic gait, with its stance, forces, speed and step frequency, stays the same.',
-          'Retraction changes the response to errors. After a stride that ends higher, the runner falls for longer and a retracting leg lands at a steeper angle. The compliant gait falls for the shortest time from apex to touchdown (' + f(R.fallTime('humanLowStiffness') * 1000, 0) + ' ms at ' + f(lo.k / 1000, 0) + ' kN/m, against ' + f(R.fallTime('humanHighStiffness') * 1000, 0) + ' ms at ' + f(hi.k / 1000, 0) + ' kN/m), so the same clearance needs the fastest retraction (' + f(lo.retractionDegPerS, 0) + ' deg/s, against ' + f(hi.retractionDegPerS, 0) + ' deg/s). That strong correction pushes lambda toward -1: the low-stiffness preset has lambda = ' + f(lo.lambda, 3) + edge(lo.lambda) + ', where the same gait with a fixed leg angle has lambda = ' + f(R.fixedLambda('humanLowStiffness'), 2) + '.',
-          'In guinea fowl running over an unexpected drop, the limb contact angle explained most of the variation in stance-phase limb loading (Daley and Biewener 2006), and swing-leg trajectories closely matched simulations optimized to regulate leg loading (Blum et al. 2014).'
+          'In the model the leg angle is set at apex and then rotates rearward at a constant rate until touchdown (Seyfarth et al. 2003). For a periodic gait the rate is a free choice: the toolkit adjusts the leg angle at apex so that the leg lands at the same angle and the same time, and the stance, forces, speed and step frequency stay the same. The rate changes only how the runner responds to errors and perturbations.',
+          'The Retraction rate tab compares five rules for the baseline gait. A fixed leg angle uses no retraction. The human rule uses the leg rotation measured in people running at ' + (H4 ? f(H4.speed_mps, 2) : '4') + ' m/s, ' + f(rh.commonPerCycle.retractionDegPerCycle, 1) + ' deg per gait cycle (Blum et al. 2011), or ' + f(rh.commonPerCycle.retractionDegPerS, 0) + ' deg/s for this gait. The clearance rule places the foot ' + f(rh.clearance.apexClearance * 100, 0) + ' cm above the ground at apex (' + f(rh.clearance.retractionDegPerS, 0) + ' deg/s). The fastest-recovery rule sets lambda to 0, so a small error in apex height disappears within one stride (' + f(rh.fastestRecovery.retractionDegPerS, 0) + ' deg/s). The ground-speed-matching rule brings the speed of the foot relative to the ground at touchdown as close to zero as a constant-length rotating leg allows (' + f(rh.groundSpeedMatching.retractionDegPerS, 0) + ' deg/s, ground speed matching ' + f(rh.groundSpeedMatching.groundSpeedMatching * 100, 0) + ' %). Blum et al. (2010) introduced ground speed matching and analyzed swing-leg strategies in human running.',
+          'Daley and Usherwood (2010) described a trade-off in the retraction rate. Slow retraction raises NMD, which lowers the risk of a fall, and raises the leg force after a drop; fast retraction lowers the force after a drop, which lowers the risk of injury, and lowers NMD.' +
+            (tradeOff ? ' In the baseline gait, the NMD estimate falls from ' + nmd(rh.fastestRecovery.nmdEstimate) + ' at the fastest-recovery rate to ' + nmd(rh.groundSpeedMatching.nmdEstimate) + ' at the ground-speed-matching rate, and the peak leg force after a ' + f(R.rulesDrop * 100, 0) + ' cm drop falls from ' + f(rh.fastestRecovery.peakForceAfterDropBW, 2) + ' to ' + f(rh.groundSpeedMatching.peakForceAfterDropBW, 2) + ' body weights (' + f(rh.fixed.peakForceSteadyBW, 2) + ' in the steady gait).' : ''),
+          'In this conservative model, fast retraction also overcorrects: ' + (overRate !== null ? 'in the baseline gait lambda falls below -1 above about ' + f(overRate, 0) + ' deg/s, and lambda = ' + f(rh.groundSpeedMatching.lambda, 2) + ' at the ground-speed-matching rate.' : 'lambda approaches -1 at fast rates.') +
+            ' Fastest recovery needs slow retraction in the baseline gait (' + f(rh.fastestRecovery.retractionDegPerS, 0) + ' deg/s)' +
+            (rl.fastestRecovery.retractionDegPerS === 0 ? ' and none in the low-stiffness gait, where lambda is already ' + f(rl.fixed.lambda, 2) + ' with a fixed leg angle.' : '.'),
+          (humanBetween ? 'The human rate lies between the rates for fastest recovery and for ground speed matching. ' : '') + 'At the human rate the model has ground speed matching of ' + f(rh.commonPerCycle.groundSpeedMatching * 100, 0) + ' % and an NMD estimate of ' + nmd(rh.commonPerCycle.nmdEstimate) +
+            (H4 ? ', ' + (humanClose ? 'close to' : 'against') + ' the ' + H4.groundSpeedMatching_pct + ' +/- ' + H4.groundSpeedMatchingSD_pct + ' % and ' + f(H4.nmd, 2) + ' +/- ' + f(H4.nmdSD, 2) + ' measured in humans at ' + f(H4.speed_mps, 2) + ' m/s (Blum et al. 2011)' : '') +
+            ', with lambda = ' + f(rh.commonPerCycle.lambda, 2) + (rh.commonPerCycle.lambda < -0.8 ? ', near -1.' : '.'),
+          'Real runners have more control than this model. Humans shorten the leg before contact (' + f(-humLen[1], 2) + ' to ' + f(-humLen[0], 2) + ' leg lengths per gait cycle) and pheasants lengthen it (' + f(pheLen[0], 2) + ' to ' + f(pheLen[1], 2) + '), and Blum et al. (2011) proposed that humans also adjust leg stiffness in anticipation of contact. Pheasants run with flatter touchdown angles (' + f(pheTd[0], 0) + ' to ' + f(pheTd[1], 0) + ' deg, against ' + f(humTd[0], 0) + ' to ' + f(humTd[1], 0) + ' deg in humans) and faster leg rotation per gait cycle (' + f(pheRot[0], 0) + ' to ' + f(pheRot[1], 0) + ' deg, against ' + f(humRot[0], 0) + ' to ' + f(humRot[1], 0) + ' deg), and they lengthen the leg; in that study this combination, with leg lengthening as the largest influence, gave pheasants the larger NMD.',
+          'Guinea fowl stepping down a visible drop used swing-leg trajectories that closely matched simulations optimized to regulate leg loading; trajectories optimized to keep a steady gait did not match (Blum et al. 2014). Vejdani et al. (2013) built on such load-regulating policies to design swing-leg control for spring-mass robots running on ground with unexpected height disturbances.'
         ],
         tasks: [
-          'With the baseline preset loaded, press Fixed leg angle and read the foot clearance and lambda. Then press Set retraction for this clearance.',
-          'Raise the minimum foot clearance to 0.08 m, press Set retraction for this clearance, and compare lambda.',
-          'Load the low-stiffness preset and note its retraction rate and lambda.'
+          'Open the Retraction rate tab and compare the five rules in the table.',
+          'Load the fastest-recovery rule, apply a 5 cm drop in the Perturbation tab, then repeat with the ground-speed-matching rule.',
+          'Load the low-stiffness preset and read the note for fastest recovery.',
+          'Change the leg stiffness, press Find periodic gait, then Recompute for the current gait in the Retraction rate tab.'
         ],
-        question: 'Why does retraction leave the periodic gait unchanged?',
-        answer: 'The stride depends on the leg angle at touchdown and on the touchdown time. Retraction starts from a shallower angle at apex and rotates the leg at the rate that brings it to the original touchdown angle at the original touchdown time, so stance and the rest of the stride repeat. Only the response to a change in fall time differs.'
+        question: 'A runner changes from the ground-speed-matching rate to the fastest-recovery rate. What happens to the NMD estimate and to the peak leg force after an unexpected drop, and why?',
+        answer: 'Both rise. With slower retraction the leg takes longer to rotate to vertical, so a larger drop still allows contact and NMD rises. After a drop, the slowly retracting leg also lands at a shallower angle and compresses more, so the peak force rises. Faster retraction lands steeper after a drop, which lowers the force but leaves less time before the leg passes vertical.'
       },
       {
         id: 'drop',
@@ -178,13 +207,12 @@ var HDS_LESSONS = {
         goal: 'Follow a gait through an unexpected drop in the ground and identify how it fails.',
         body: [
           'A drop in the ground during flight lets the body fall farther before touchdown. In the model, the apex height above the new ground rises by the drop height at the same forward speed, which adds m g h of mechanical energy, and the model has no damping to remove it.',
-          'With swing-leg retraction, the longer fall after a drop gives the leg more time to rotate, so it lands at a steeper angle, and the next apex undershoots. For each preset the smallest drop that ends the run within 20 strides (' + f(R.drop('humanLowStiffness').first.height * 100, 0) + ', ' + f(R.drop('human').first.height * 100, 0) + ' and ' + f(R.drop('humanHighStiffness').first.height * 100, 0) + ' cm for the low-stiffness, baseline and high-stiffness presets) completes ' + (R.drop('human').first.strides === 1 ? 'one stride' : f(R.drop('human').first.strides, 0) + ' strides') + ' after the drop; the apex at the end of that stride falls below the height needed to place the leg. The run ends through overcorrection on the first stride after the drop, even though each unperturbed stride starts with the foot ' + f(R.clearance * 100, 0) + ' cm above the ground.',
+          'The presets use the human retraction rate (lesson 6), which places the foot ' + f(lo.apexClearance * 100, 1) + ', ' + f(h.apexClearance * 100, 1) + ' and ' + f(hi.apexClearance * 100, 1) + ' cm above the ground at apex in the low-stiffness, baseline and high-stiffness gaits. After a drop, the longer fall gives the retracting leg more time to rotate, so it lands at a steeper angle, and the next apex undershoots. The smallest drops that end a run within 20 strides are ' + f(dl.first.height * 100, 0) + ', ' + f(dh.first.height * 100, 0) + ' and ' + f(dhi.first.height * 100, 0) + ' cm' +
+            (oneStride ? '; in each case the first stride after the drop completes, and the apex at its end falls below the height needed to place the leg. The run ends through overcorrection on the first stride after the drop, even though each unperturbed stride starts with the foot several centimeters above the ground.' : '.'),
           'With a fixed leg angle, the same gaits survive drops of ' + f(R.fixedDrop('humanLowStiffness').maxDrop * 100, 0) + ', ' + f(R.fixedDrop('human').maxDrop * 100, 0) + ' and ' + f(R.fixedDrop('humanHighStiffness').maxDrop * 100, 0) + ' cm, and the first drop not survived ends the run ' + f(R.fixedDrop('humanLowStiffness').first.strides, 0) + ', ' + f(R.fixedDrop('human').first.strides, 0) + ' and ' + f(R.fixedDrop('humanHighStiffness').first.strides, 0) + ' strides after the drop, as the error builds over several strides.',
           'Real animals do not behave as a perfect conservative spring-mass system. After an unexpected drop they have time to recover with non-conservative dynamics, such as muscle work and damping, provided the leg makes contact and takes load in the stance right after the drop. The normalized maximum drop of Daley and Usherwood (2010) measures that first-contact limit: NMD = dHmax / L, with dHmax = (g / 2) (Phi / omega)^2, where Phi is the stance half-angle (90 deg minus the touchdown angle) and omega the leg retraction rate. For a larger drop the leg rotates past vertical before the foot reaches the ground and misses stance.',
-          'At their own retraction rates, the NMD estimate is ' + nmd(lo.nmdEstimate) + ', ' + nmd(h.nmdEstimate) + ' and ' + nmd(hi.nmdEstimate) + ' leg lengths for the low-stiffness, baseline and high-stiffness presets' +
-            (ownRises ? ': the compliant leg retracts fastest to keep its foot clearance and reaches vertical soonest, so its NMD is the smallest.' : '.') +
-            ' At one common rate of ' + f(refRate, 1) + ' deg/s the values are ' + nmd(lo.nmdEstimateAtReference) + ', ' + nmd(h.nmdEstimateAtReference) + ' and ' + nmd(hi.nmdEstimateAtReference) +
-            (refFalls ? ': the order reverses, because the compliant leg lands with the widest stance half-angle, the outcome Daley and Usherwood (2010) predicted.' : '.') +
+          'At the common retraction rate the NMD estimate is ' + nmd(lo.nmdEstimate) + ', ' + nmd(h.nmdEstimate) + ' and ' + nmd(hi.nmdEstimate) + ' leg lengths for the low-stiffness, baseline and high-stiffness presets' +
+            (lo.nmdEstimate > h.nmdEstimate && h.nmdEstimate > hi.nmdEstimate ? ': the compliant leg lands with the widest stance half-angle and has the largest NMD, the outcome Daley and Usherwood (2010) predicted.' : '.') +
             ' The simulated first-contact limit is ' + nmd(lo.nmdSimulated) + ', ' + nmd(h.nmdSimulated) + ' and ' + nmd(hi.nmdSimulated) +
             (simAbove ? '; it exceeds the estimate because it includes the downward speed at touchdown and the change in hip height.' : '.'),
           'The largest drops survived for 20 strides are ' + f(lo.maxDrop, 2) + ', ' + f(h.maxDrop, 2) + ' and ' + f(hi.maxDrop, 2) + ' leg lengths' + (farAbove ? ', far below these first-contact limits' : '') + '. The 20-stride test asks whether the conservative model, with no way to remove the added energy, keeps running; NMD asks whether the first stance after the drop begins with a loaded leg, the condition for an animal to recover with muscle work.',
@@ -194,7 +222,7 @@ var HDS_LESSONS = {
           'Set the drop to 5 cm and press Compare the three presets.',
           'In the Stride tab, press Compute simulated first-contact limit for the baseline preset, then for the low-stiffness preset.',
           'Find the smallest drop that stops the baseline gait and read the stride at which it stops.',
-          'Press Fixed leg angle in the sidebar and repeat the same drop.'
+          'Set the retraction rule to a fixed leg angle in the sidebar, apply it, and repeat the same drop.'
         ],
         question: 'Why does a retracting leg land at a steeper angle after a drop?',
         answer: 'The leg rotates at a constant rate from apex. A drop lengthens the fall from apex to touchdown, so the leg rotates for longer and reaches a steeper angle at touchdown.'

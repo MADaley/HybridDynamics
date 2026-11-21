@@ -23,7 +23,7 @@ for name = names
         fprintf('%-20s failed on stride %d after the drop (%s)\n', name, n + 1, info.exitReason);
     end
 end
-%[text] The failure mode `footBelowGround` means that the next apex was lower than the height needed to place the leg at its apex angle: the foot would meet the ground before the leg is placed. The presets lift the foot 5 cm at apex by swing-leg retraction, so this failure needs an apex that falls more than 5 cm below the periodic gait. After a drop the body falls longer, the retracting leg lands steeper, and the next apex undershoots.
+%[text] The failure mode `footBelowGround` means that the next apex was lower than the height needed to place the leg at its apex angle: the foot would meet the ground before the leg is placed. With swing-leg retraction at the human rate the presets hold the foot several centimeters above the ground at apex, so this failure needs an apex that falls that far below the periodic gait. After a drop the body falls longer, the retracting leg lands steeper, and the next apex undershoots.
 %[text] ## 2. Largest drop survived
 for name = names
     [p, apex] = slip_defaults(name);
@@ -41,7 +41,7 @@ for name = names
     fprintf('%-20s NMD estimate %.2f (at %.0f deg/s: %.2f); simulated first contact %.2f\n', ...
         name, D.estimateNMD, wRef, D.estimateDropAtReference / p.L0, D.simulatedNMD);
 end
-%[text] With retraction chosen for a 5 cm foot clearance, the compliant leg retracts fastest and has the smallest NMD. At one common retraction rate the compliant leg has the largest NMD, the outcome Daley and Usherwood (2010) predicted. The conservative 20-stride test above gives far smaller drops: it asks for recovery with no muscle work at all.
+%[text] The presets share one retraction rate, so the compliant leg has the largest NMD, the outcome Daley and Usherwood (2010) predicted. Lesson 6 shows how the ranking changes when each gait gets its own rate. The conservative 20-stride test above gives far smaller drops: it asks for recovery with no muscle work at all.
 %[text] ## Try this
 %[text] Run `ex08_slip_dropStep` to plot apex height and speed stride by stride.
 %[text] In guinea fowl running over an unexpected drop, adjustment of limb contact angle accounted for 80 % of the variation in stance-phase limb loading after the drop (Daley and Biewener 2006). Use Lesson 3 to explore how the leg angle changes peak force after a drop.

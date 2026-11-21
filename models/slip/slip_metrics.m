@@ -28,6 +28,8 @@ function M = slip_metrics(p, s, outputStep)
 %            forceTimeCostIndex (1/s): inverse contact time, proportional
 %              to the metabolic cost of supporting body weight in the
 %              force-time hypothesis of Kram and Taylor (1990).
+%   Landing  groundSpeedMatching: GSM = 1 - |v_foot| / |v_CoM| at touchdown
+%            (Blum et al. 2010); 1 means the foot meets the ground at rest
 %   Dimensionless  froude (v^2 / g L0), relativeStiffness (k L0 / m g)
 %   Check    energyChange (J): mechanical energy at the end minus the start
 %   Traces   trace.t, trace.x, trace.phase, trace.Fx, trace.Fy (N),
@@ -87,6 +89,13 @@ M.verticalStiffness     = max(Fy) / M.comDropStance;
 M.peakElasticEnergy       = 0.5 * p.k * M.legCompression^2;
 M.positiveWorkPerDistance = M.peakElasticEnergy / (p.m * M.stepLength);
 M.forceTimeCostIndex      = 1 / M.contactTime;
+
+%% ----- Foot landing speed (ground speed matching) -----
+xTD = ev.xBefore(iTD, :);
+aTD = deg2rad(M.touchdownAngleDeg);
+vTD = xTD(3:4)';
+vFoot = vTD + p.L0 * deg2rad(p.retractionDegPerS) * [-sin(aTD); -cos(aTD)];
+M.groundSpeedMatching = 1 - norm(vFoot) / norm(vTD);
 
 %% ----- Dimensionless groups -----
 M.froude            = M.meanSpeed^2 / (p.g * p.L0);

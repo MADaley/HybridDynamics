@@ -81,6 +81,7 @@
           <button type="button" role="tab" id="tab-stride" aria-controls="panel-stride" aria-selected="true">Stride</button>
           <button type="button" role="tab" id="tab-returnMap" aria-controls="panel-returnMap" aria-selected="false" tabindex="-1">Return map</button>
           <button type="button" role="tab" id="tab-family" aria-controls="panel-family" aria-selected="false" tabindex="-1">Same speed, different legs</button>
+          <button type="button" role="tab" id="tab-retraction" aria-controls="panel-retraction" aria-selected="false" tabindex="-1">Retraction rate</button>
           <button type="button" role="tab" id="tab-perturb" aria-controls="panel-perturb" aria-selected="false" tabindex="-1">Perturbation</button>
           <button type="button" role="tab" id="tab-map" aria-controls="panel-map" aria-selected="false" tabindex="-1">Parameter map</button>
         </div>
@@ -120,13 +121,40 @@
           <h3>Three gaits at the same speed</h3>
           <div class="table-wrap"><table id="familyTable" class="data-table"></table></div>
           <div class="inline-controls">
-            <label for="familyClearance">Minimum foot clearance at apex (m; blank or 0 for a fixed leg angle)</label>
-            <input type="number" id="familyClearance" min="0" max="0.3" step="0.005">
+            <label for="familyRule">Retraction rule</label>
+            <select id="familyRule">
+              <option value="commonPerCycle">Common rate per gait cycle (deg/cycle)</option>
+              <option value="common">Common rate (deg/s)</option>
+              <option value="clearance">Foot clearance at apex (m)</option>
+              <option value="fastestRecovery">Fastest recovery (lambda = 0)</option>
+              <option value="groundSpeedMatching">Ground speed matching</option>
+              <option value="fixed">Fixed leg angle</option>
+            </select>
+            <label for="familyRuleValue" id="familyRuleValueLabel">Value</label>
+            <input type="number" id="familyRuleValue" step="any">
             <button type="button" id="familyRecompute" class="btn">Recompute for current body and speed</button>
             <label class="check"><input type="checkbox" id="familyDrop"> Include the drop test (slower)</label>
             <button type="button" id="familyRestore" class="btn btn-quiet">Show the MATLAB family</button>
             <progress id="familyProgress" max="1" value="0" hidden></progress>
           </div>
+        </div>
+
+        <div role="tabpanel" id="panel-retraction" aria-labelledby="tab-retraction" class="tabpanel" hidden>
+          <p id="retrIntro"></p>
+          <h3>Five retraction rules</h3>
+          <div class="table-wrap"><table id="retrTable" class="data-table"></table></div>
+          <div class="inline-controls">
+            <button type="button" id="retrRecompute" class="btn">Recompute for the current gait</button>
+            <button type="button" id="retrRestore" class="btn btn-quiet">Show the MATLAB results for this preset</button>
+            <progress id="retrProgress" max="1" value="0" hidden></progress>
+          </div>
+          <h3>Measures against retraction rate</h3>
+          <canvas id="retrCanvas" class="plot"></canvas>
+          <p id="retrNote" class="small"></p>
+          <div id="retrText" class="prose"></div>
+          <h3>Measured swing-leg kinematics</h3>
+          <p id="swingLegNote" class="small"></p>
+          <div class="table-wrap"><table id="swingLegTable" class="data-table"></table></div>
         </div>
 
         <div role="tabpanel" id="panel-perturb" aria-labelledby="tab-perturb" class="tabpanel" hidden>

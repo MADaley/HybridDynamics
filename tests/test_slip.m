@@ -160,6 +160,30 @@ verifyTrue(testCase, all(isnan(sNext)));
 verifyEqual(testCase, info.exitReason, "terminal:missedStance");
 end
 
+function testRetractionRules(testCase)
+% Each rule keeps the periodic gait. Fastest recovery gives lambda = 0;
+% ground speed matching maximizes GSM; per-cycle rates convert with the
+% gait cycle (two steps).
+[p, a] = slip_defaults("human");
+[q1, i1] = slip_retractionRule(p, a, "fastestRecovery");
+verifyLessThan(testCase, abs(i1.lambda), 1e-4);
+[q2, i2] = slip_retractionRule(p, a, "groundSpeedMatching");
+G0 = slip_groundSpeedMatching(slip_setRetraction(p, a, i2.retractionDegPerS + 5), a);
+G1 = slip_groundSpeedMatching(slip_setRetraction(p, a, i2.retractionDegPerS - 5), a);
+verifyGreaterThan(testCase, i2.gsm, max(G0.gsm, G1.gsm));
+[~, i3] = slip_retractionRule(p, a, "commonPerCycle", 90);
+[~, m] = slip_returnMap(p, [a.y; a.vx]);
+verifyEqual(testCase, i3.retractionDegPerS, 90 / (2 * m.period), 'RelTol', 1e-9);
+for q = {q1, q2}
+    s = slip_returnMap(q{1}, [a.y; a.vx]);
+    verifyEqual(testCase, s, [a.y; a.vx], 'AbsTol', 1e-7);
+end
+% Low-stiffness gait: lambda < 0 with no retraction, so the rule returns 0.
+[pl, al] = slip_defaults("humanLowStiffness");
+[~, il] = slip_retractionRule(pl, al, "fastestRecovery");
+verifyEqual(testCase, il.retractionDegPerS, 0);
+end
+
 function testStrideFailureIsReported(testCase)
 % A leg angle steeper than the apex allows puts the foot below ground.
 p = testCase.TestData.p; a = testCase.TestData.apex;

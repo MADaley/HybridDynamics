@@ -9,15 +9,16 @@ target = struct('meanSpeed', presets.meanSpeed(1), 'hold', "stepFrequency", ...
 fprintf('Average speed %.1f m/s, step frequency %.1f steps per second\n', target.meanSpeed, target.stepFrequency);
 %[text] ## 1. Solve the family of gaits
 %[text] `slip_stiffnessFamily` starts from the baseline gait and steps through stiffness, using each solution as the starting guess for the next. Set `runDropTest = true` to add the drop test (about 30 s).
-%[text] Each gait gets swing-leg retraction where needed to hold the foot at least `footClearance` above the ground at apex. Retraction leaves the periodic gait unchanged; it changes only the response to perturbations. Set `footClearance = NaN` for a fixed leg angle.
+%[text] Every gait gets the same swing-leg retraction rate, so the gaits differ only in leg stiffness: the leg rotation rate measured at touchdown in humans running at 4 m/s, 82 degrees per gait cycle (Blum et al. 2011). Retraction leaves each periodic gait unchanged; it changes only the response to perturbations. Lesson 6 compares other ways to choose the rate.
 runDropTest = false;
-footClearance = 0.05;    % m
+rules = slip_defaultRetractionRules();
 kValues = (6:1:35) * 1000;
 T = slip_stiffnessFamily(struct('p', p, 'y', apex.y, 'vx', apex.vx), kValues, target, ...
-    struct('terrain', runDropTest, 'footClearance', footClearance));
+    struct('terrain', runDropTest, 'retractionRule', rules{2, 2}, 'retractionValue', rules{2, 3}));
+fprintf('Common retraction rate: %.1f deg/s\n', T.retractionDegPerS(1));
 %[text] ## 2. Compare the three presets
 [~, rows] = ismember(presets.k, T.k);
-T(rows, ["k" "touchdownAngleDeg" "retractionDegPerS" "contactTime" "peakVerticalForceBW" "positiveWorkPerDistance" "forceTimeCostIndex" "lambda"])
+T(rows, ["k" "touchdownAngleDeg" "apexClearance" "contactTime" "peakVerticalForceBW" "positiveWorkPerDistance" "forceTimeCostIndex" "lambda" "nmdEstimate"])
 %[text] Across the family a stiffer leg lands at a steeper angle, stays on the ground for less time and reaches a higher peak force. The leg spring stores less energy per step.
 %[text] ## 3. Two energy-cost proxies
 %[text] The model does no net mechanical work: the spring returns all the energy it stores. Two proxies estimate what muscles would have to provide.
@@ -32,7 +33,11 @@ stable = abs(T.lambda) < 1;
 fprintf('Stable (|lambda| < 1) from %.0f to %.0f N/m in this range\n', min(T.k(stable)), max(T.k(stable)));
 [~, iBest] = min(abs(T.lambda));
 fprintf('Fastest recovery (smallest |lambda|) at %.0f N/m, lambda = %+.3f\n', T.k(iBest), T.lambda(iBest));
-%[text] Retraction couples the touchdown angle to the fall time: a higher apex means a longer fall and a steeper leg at touchdown. A compliant leg lands soon after apex, so lifting its foot by the same clearance needs a faster retraction, which pushes $\lambda$ toward $-1$. The low-stiffness preset sits near that edge. Compare with `footClearance = NaN`, where the foot clearance is only a few centimeters and small changes in apex height end the run. With the drop test on, stiffer legs survive larger drops in this model; the failures come on the first stride after the drop, when the next apex undershoots by more than the foot clearance. Daley and Usherwood (2010) proposed a kinematic measure, the normalized maximum drop, which predicts that compliant legs negotiate relatively larger drops. That measure and this drop test answer different questions: the drop test here holds the leg angle fixed and counts strides to failure.
+%[text] Retraction couples the touchdown angle to the fall time: a higher apex means a longer fall and a steeper leg at touchdown. At this common rate every gait has a negative $\lambda$: errors in apex height change sign from stride to stride. With the drop test on, the failures come on the first stride after the drop, when the next apex undershoots.
+%[text] ## 5. Normalized maximum drop at a common retraction rate
+%[text] Real animals can recover from a drop through muscle work and damping in the strides that follow, provided the leg makes contact in the stance right after the drop. Daley and Usherwood (2010) measured that first-contact limit with the normalized maximum drop, $\mathrm{NMD} = \frac{g}{2} (\Phi / \bar{\omega})^2 / L$, with $\Phi$ the stance half-angle and $\bar{\omega}$ the retraction rate. At one common rate, NMD grows with $\Phi^2$: compliant legs sweep a larger angle and have the larger NMD.
+T(rows, ["k" "stanceHalfAngleDeg" "nmdEstimate" "nmdSimulated"])
+%[text] The simulated first-contact limit follows the actual flight path, including the downward speed at the usual touchdown and the rise of the hip as the leg rotates toward vertical, which the estimate leaves out. Blum et al. (2011) extended the NMD in the same direction.
 plotStiffnessFamily(T, presets(:, {'k', 'label'}));
 %[text] ## Try this
 %[text] Change `target.stepFrequency` to 2.8 or 3.2 and rerun. How do the stable range and the presets move?

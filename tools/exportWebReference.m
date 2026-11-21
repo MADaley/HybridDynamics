@@ -14,7 +14,10 @@ run(fullfile(root, 'setupHybridDynamics.m'));
 
 %% ===== USER SETTINGS: stiffness family shown on the page =====
 kValues = (6:1:35) * 1000;        % leg stiffness values (N/m)
-footClearance = 0.05;             % minimum foot height at apex (m), as the presets
+rules = slip_defaultRetractionRules();   % retraction rules compared in lesson 6
+familyRule = rules(2, :);         % common rate: human data at 4 m/s (Blum et al. 2011)
+sweepRates = 0:5:250;             % retraction rates for the sweep (deg/s)
+dropForForce = 0.05;              % drop for the peak-force test (m)
 
 %% 1. Settings and presets
 [p, apex, spec, presets] = slip_defaults("human");
@@ -61,10 +64,28 @@ ref.slip.cases = [cases{:}];
 target = struct('meanSpeed', presets.meanSpeed(1), 'hold', "stepFrequency", ...
     'stepFrequency', presets.stepFrequency(1));
 T = slip_stiffnessFamily(struct('p', p, 'y', apex.y, 'vx', apex.vx), kValues, ...
-    target, struct('terrain', true, 'footClearance', footClearance));
+    target, struct('terrain', true, 'retractionRule', familyRule{2}, ...
+    'retractionValue', familyRule{3}));
 ref.slip.family.target = target;
-ref.slip.family.footClearance = footClearance;
+ref.slip.family.retraction = struct('name', familyRule{1}, 'rule', familyRule{2}, ...
+    'value', familyRule{3}, 'degPerS', T.retractionDegPerS(1));
 ref.slip.family.referenceRetractionDegPerS = p.retractionDegPerS;
+
+%% 3c. Retraction rules and sweep for each preset (lesson 6)
+ref.slip.retractionRules = struct('name', rules(:, 1), 'rule', rules(:, 2), 'value', rules(:, 3));
+for i = 1:height(presets)
+    [q, a] = slip_defaults(presets.name(i));
+    C = slip_compareRetractionRules(q, a, rules, struct('dropHeight', dropForForce));
+    W = slip_retractionSweep(q, a, sweepRates, struct('dropHeight', dropForForce));
+    ref.slip.retractionByPreset(i) = struct('name', presets.name(i), ...
+        'dropHeight', dropForForce, 'rules', table2struct(C), 'sweep', table2struct(W)); %#ok<SAGROW>
+end
+fprintf('Retraction rules and sweep done.\n');
+
+%% 3d. Measured swing-leg kinematics (Blum et al. 2011)
+ref.data.swingLeg = table2struct(readtable(fullfile(root, 'data', ...
+    'swingLegKinematics_Blum2011.csv'), 'TextType', 'string'));
+ref.data.swingLegSource = "Blum Y, Birn-Jeffery A, Daley MA, Seyfarth A (2011) J Theor Biol 281:97-106, Tables 1 and 2";
 
 %% 3b. Retraction for a foot clearance (reference for the web function)
 q = p; q.legAngleDeg = presets.touchdownAngleDeg(presets.name == "human"); q.retractionDegPerS = 0;
@@ -125,7 +146,7 @@ c.dropFailure = "";
 c.nmd = [];
 if periodic
     M = slip_metrics(p, [apex.y; apex.vx]);
-    keep = ["period" "contactTime" "flightTime" "stepLength" "meanSpeed" ...
+    keep = ["period" "contactTime" "flightTime" "stepLength" "meanSpeed" "groundSpeedMatching" ...
         "touchdownAngleDeg" "takeoffAngleDeg" "legCompression" "peakLegForceBW" ...
         "peakVerticalForceBW" "peakBrakingForceBW" "comDropStance" ...
         "peakElasticEnergy" "positiveWorkPerDistance" "forceTimeCostIndex"];
