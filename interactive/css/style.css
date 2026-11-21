@@ -164,6 +164,9 @@ main:focus { outline: none; }
 .control-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
 .control-head label { font-weight: 500; }
 .control-head input[type="number"] { width: 6.5em; text-align: right; }
+/* The step attribute sets the arrow increment only; a typed value between
+   steps is valid here, so no invalid-value outline. */
+.control-head input[type="number"]:invalid { box-shadow: none; }
 .control .desc { font-size: 0.8rem; color: var(--muted); margin: 0; }
 .button-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .target-row { display: grid; grid-template-columns: 1fr 6.5em; gap: 6px 8px; align-items: center; margin: 6px 0; }

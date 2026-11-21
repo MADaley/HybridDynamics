@@ -154,6 +154,12 @@
   ];
   var SLIP_STEPS = { m: 0.5, L0: 0.01, k: 100, g: 0.01, legAngleDeg: 0.01,
     retractionDegPerS: 1, apexHeight: 0.001, apexSpeed: 0.001 };
+  // One click on the arrows of a number box (or the up and down keys) moves
+  // the value by this amount; typed values keep full precision.
+  var SLIP_SPIN = { m: 1, L0: 0.01, k: 500, g: 0.01, legAngleDeg: 0.1,
+    retractionDegPerS: 1, apexHeight: 0.01, apexSpeed: 0.1 };
+  var BALL_SPIN = { g: 0.01, radius: 0.01, restitution: 0.01, restSpeed: 0.001,
+    xMax: 0.1, yMax: 0.1, x0: 0.1, y0: 0.1, vx0: 0.1, vy0: 0.1 };
   var SLIP_LABELS = { m: 'Body mass', L0: 'Leg length', k: 'Leg stiffness', g: 'Gravity',
     legAngleDeg: 'Leg angle at apex', retractionDegPerS: 'Leg retraction rate',
     apexHeight: 'Apex height', apexSpeed: 'Forward speed at apex' };
@@ -181,12 +187,12 @@
     if (BALL_X0[name] !== undefined) S.ball.x0[BALL_X0[name]] = v; else S.ball.p[name] = v;
   }
 
-  function makeControl(row, label, step, getter, setter, onChange) {
+  function makeControl(row, label, step, getter, setter, onChange, spin) {
     var id = 'ctl-' + row.name;
     var wrap = el('div', { 'class': 'control' });
     var head = el('div', { 'class': 'control-head' });
     var lab = el('label', { 'for': id + '-num' }, label + ' (' + row.units + ')');
-    var num = el('input', { type: 'number', id: id + '-num', step: 'any', min: row.min, max: row.max,
+    var num = el('input', { type: 'number', id: id + '-num', step: spin || 'any', min: row.min, max: row.max,
       'aria-describedby': id + '-desc' });
     head.appendChild(lab);
     head.appendChild(num);
@@ -259,7 +265,7 @@
       fs.appendChild(el('legend', null, g[1]));
       SPEC.filter(function (r) { return r.group === g[0]; }).forEach(function (r) {
         fs.appendChild(makeControl(r, SLIP_LABELS[r.name] || r.name, SLIP_STEPS[r.name] || 0.01,
-          getSlipValue, setSlipValue, onSlipChange));
+          getSlipValue, setSlipValue, onSlipChange, SLIP_SPIN[r.name]));
       });
       if (g[0] === 'contact condition') fs.appendChild(ruleBlock());
       side.appendChild(fs);
@@ -388,7 +394,7 @@
         return r.group === g[0] && r.max > r.min && BALL_LABELS[r.name];
       }).forEach(function (r) {
         fs.appendChild(makeControl(r, BALL_LABELS[r.name], r.name === 'restSpeed' ? 0.001 : 0.01,
-          getBallValue, setBallValue, onBallChange));
+          getBallValue, setBallValue, onBallChange, BALL_SPIN[r.name]));
       });
       side.appendChild(fs);
     });
